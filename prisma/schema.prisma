@@ -1,0 +1,198 @@
+// Prisma Schema for KIST Poly Clinic
+// Migrated from Django models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// Enums
+enum UserRole {
+  patient
+  admin
+}
+
+enum AppointmentStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+enum LaboratoryTestStatus {
+  pending
+  confirmed
+  completed
+  cancelled
+}
+
+enum PharmacyOrderStatus {
+  pending
+  processing
+  delivered
+  cancelled
+}
+
+enum PaymentStatus {
+  pending
+  completed
+  failed
+}
+
+enum PrescriptionStatus {
+  pending
+  verified
+  rejected
+}
+
+enum StockStatus {
+  IN_STOCK
+  OUT_OF_STOCK
+}
+
+// Models
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  email     String   @unique
+  name      String
+  address   String?
+  password  String
+  role      UserRole @default(patient)
+  isActive  Boolean  @default(true) @map("is_active")
+  isStaff   Boolean  @default(false) @map("is_staff")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  appointments    Appointment[]
+  laboratoryTests LaboratoryTest[]
+  pharmacyOrders  PharmacyOrder[]
+  medicalRecords  MedicalRecord[]
+  prescriptions   Prescription[]
+
+  @@index([phone, isActive])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Medicine {
+  id          String      @id @default(cuid())
+  name        String
+  description String
+  price       Decimal     @db.Decimal(10, 2)
+  image       String?
+  category    String
+  stock       StockStatus @default(IN_STOCK)
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  // Relations
+  orders PharmacyOrder[]
+
+  @@index([category])
+  @@index([stock])
+  @@map("medicines")
+}
+
+model Appointment {
+  id                   String            @id @default(cuid())
+  patientId            String            @map("patient_id")
+  doctorName           String            @map("doctor_name")
+  doctorSpecialization String            @map("doctor_specialization")
+  appointmentDate      DateTime          @map("appointment_date") @db.Date
+  appointmentTime      String            @map("appointment_time")
+  status               AppointmentStatus @default(pending)
+  reason               String?
+  notes                String?
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, appointmentDate])
+  @@index([status])
+  @@map("appointments")
+}
+
+model LaboratoryTest {
+  id              String               @id @default(cuid())
+  patientId       String               @map("patient_id")
+  testName        String               @map("test_name")
+  testDescription String               @map("test_description")
+  testDate        DateTime             @map("test_date") @db.Date
+  testTime        String               @map("test_time")
+  status          LaboratoryTestStatus @default(pending)
+  notes           String?
+  createdAt       DateTime             @default(now()) @map("created_at")
+  updatedAt       DateTime             @updatedAt @map("updated_at")
+
+  // Relations
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, testDate])
+  @@index([status])
+  @@map("laboratory_tests")
+}
+
+model PharmacyOrder {
+  id              String              @id @default(cuid())
+  patientId       String              @map("patient_id")
+  medicineId      String              @map("medicine_id")
+  quantity        Int                 @default(1)
+  pricePerUnit    Decimal             @map("price_per_unit") @db.Decimal(10, 2)
+  totalAmount     Decimal             @map("total_amount") @db.Decimal(10, 2)
+  deliveryAddress String?             @map("delivery_address")
+  paymentMethod   String?             @map("payment_method")
+  status          PharmacyOrderStatus @default(pending)
+  paymentStatus   PaymentStatus       @default(pending) @map("payment_status")
+  createdAt       DateTime            @default(now()) @map("created_at")
+  updatedAt       DateTime            @updatedAt @map("updated_at")
+
+  // Relations
+  patient  User     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  medicine Medicine @relation(fields: [medicineId], references: [id], onDelete: Restrict)
+
+  @@index([patientId, status])
+  @@index([medicineId])
+  @@index([paymentStatus])
+  @@map("pharmacy_orders")
+}
+
+model MedicalRecord {
+  id          String   @id @default(cuid())
+  patientId   String   @map("patient_id")
+  title       String
+  description String?
+  fileUrl     String   @map("file_url")
+  fileType    String   @map("file_type")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId])
+  @@index([createdAt])
+  @@map("medical_records")
+}
+
+model Prescription {
+  id                   String             @id @default(cuid())
+  patientId            String             @map("patient_id")
+  prescriptionImageUrl String             @map("prescription_image_url")
+  status               PrescriptionStatus @default(pending)
+  notes                String?
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+
+  // Relations
+  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@index([patientId, status])
+  @@map("prescriptions")
+}
