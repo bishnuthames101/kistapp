@@ -14,7 +14,7 @@ const securityHeaders = [
       "default-src 'self'",
       "script-src 'self' 'unsafe-eval' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
-      "img-src 'self' blob: data: https://*.supabase.co https://raw.githubusercontent.com",
+      "img-src 'self' blob: data: https://*.supabase.co https://raw.githubusercontent.com https://images.unsplash.com",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co https://solid-polliwog-76095.upstash.io",
       "frame-ancestors 'none'",
