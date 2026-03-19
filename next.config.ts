@@ -17,6 +17,7 @@ const securityHeaders = [
       "img-src 'self' blob: data: https://*.supabase.co https://raw.githubusercontent.com https://images.unsplash.com",
       "font-src 'self'",
       "connect-src 'self' https://*.supabase.co https://solid-polliwog-76095.upstash.io",
+      "frame-src 'self' https://vercel.live",
       "frame-ancestors 'none'",
     ].join("; "),
   },
