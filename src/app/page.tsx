@@ -73,6 +73,13 @@ export default function HomePage() {
                   <Microscope className="w-5 h-5" />
                   Book Lab Test
                 </Link>
+                <Link
+                  href="/epharmacy"
+                  className="bg-yellow-400 text-blue-900 px-8 py-4 rounded-lg hover:bg-yellow-300 transition-all font-semibold flex items-center justify-center gap-2 shadow-xl"
+                >
+                  <Pill className="w-5 h-5" />
+                  Buy Medicine
+                </Link>
               </div>
 
               {/* Quick Stats */}
