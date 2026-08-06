@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 export const metadata = pageMetadata({
   title: "All Laboratory Tests & Prices",
   description:
-    "Full list of individual laboratory tests at KIST Poly Clinic, Lalitpur - CBC, blood sugar, lipid profile, thyroid, liver and kidney function, HbA1c and urine routine, with prices and turnaround times.",
+    "Full list of individual laboratory tests at Kist Poly Clinic, Lalitpur - CBC, blood sugar, lipid profile, thyroid, liver and kidney function, HbA1c and urine routine, with prices and turnaround times.",
   path: "/lab-tests/all",
   keywords: [
     "lab test price Nepal",

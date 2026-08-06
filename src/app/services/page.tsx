@@ -7,7 +7,7 @@ import { absoluteUrl, breadcrumbJsonLd, pageMetadata, serviceJsonLd } from '@/li
 export const metadata = pageMetadata({
   title: 'Our Medical Services',
   description:
-    'OPD consultation, general and laser surgery, piles treatment, orthopedics, ultrasound, ECG, X-ray, gynecology, neurology and doctor home visits at KIST Poly Clinic, Lalitpur.',
+    'OPD consultation, general and laser surgery, piles treatment, orthopedics, ultrasound, ECG, X-ray, gynecology, neurology and doctor home visits at Kist Poly Clinic, Lalitpur.',
   path: '/services',
   keywords: ['medical services Lalitpur', 'OPD consultation Nepal', 'ultrasound Lalitpur', 'X-ray near me'],
 });
@@ -16,7 +16,7 @@ export default function ServicesPage() {
   const serviceListJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Medical services at KIST Poly Clinic',
+    name: 'Medical services at Kist Poly Clinic',
     itemListElement: services.map((service, index) => ({
       '@type': 'ListItem',
       position: index + 1,

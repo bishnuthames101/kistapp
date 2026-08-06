@@ -8,7 +8,7 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata = pageMetadata({
   title: 'Laboratory Tests & Health Checkups',
   description:
-    'Book NABL-certified lab tests at KIST Poly Clinic, Lalitpur. Blood tests, thyroid, diabetes, hormone and full body checkup packages with home sample collection and fast results.',
+    'Book NABL-certified lab tests at Kist Poly Clinic, Lalitpur. Blood tests, thyroid, diabetes, hormone and full body checkup packages with home sample collection and fast results.',
   path: '/lab-tests',
   keywords: ['lab test Lalitpur', 'blood test near me', 'full body checkup Nepal', 'home sample collection Lalitpur'],
 });

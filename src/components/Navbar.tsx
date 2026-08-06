@@ -36,7 +36,7 @@ export default function Navbar() {
     <nav className={`glass-navbar sticky top-0 z-50 transform transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
-          <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="KIST Poly Clinic home">
+          <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="Kist Poly Clinic home">
             <Image
               src="/logo.jpg"
               alt=""
@@ -46,7 +46,7 @@ export default function Navbar() {
               className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover ring-1 ring-blue-600/20"
             />
             <span className="flex flex-col leading-tight">
-              <span className="text-lg sm:text-xl font-bold text-blue-600">KIST Poly Clinic</span>
+              <span className="text-lg sm:text-xl font-bold text-blue-600">Kist Poly Clinic</span>
               <span className="hidden lg:block text-[11px] text-gray-500">
                 &amp; Medical Center &middot; Estd. 2067
               </span>

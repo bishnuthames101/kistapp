@@ -4,7 +4,7 @@ import { pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
   title: 'Create an Account',
-  description: 'Register for a KIST Poly Clinic account to book appointments, order medicines and track lab tests.',
+  description: 'Register for a Kist Poly Clinic account to book appointments, order medicines and track lab tests.',
   path: '/register',
   noIndex: true,
 });

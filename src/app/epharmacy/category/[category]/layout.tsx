@@ -21,7 +21,7 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: `${name} Medicines`,
-    description: `Browse ${name.toLowerCase()} medicines available at KIST Poly Clinic's online pharmacy in Lalitpur, with home delivery across the Kathmandu Valley.`,
+    description: `Browse ${name.toLowerCase()} medicines available at Kist Poly Clinic's online pharmacy in Lalitpur, with home delivery across the Kathmandu Valley.`,
     path: `/epharmacy/category/${category}`,
     keywords: [`${name} medicine Nepal`, `buy ${name} online Lalitpur`],
   });

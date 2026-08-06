@@ -6,23 +6,34 @@ import type { Metadata } from "next";
  * directory listings, so they must match those listings character for character.
  */
 export const siteConfig = {
-  name: "KIST Poly Clinic",
-  legalName: "KIST Poly Clinic Pvt. Ltd.",
-  shortName: "KIST Clinic",
+  name: "Kist Poly Clinic",
+  legalName: "Kist Poly Clinic Pvt. Ltd.",
+  shortName: "Kist Clinic",
   url: (process.env.NEXT_PUBLIC_APP_URL || "https://kistpolyclinic.com.np").replace(
     /\/$/,
     ""
   ),
   description:
-    "KIST Poly Clinic in Balkumari, Lalitpur offers doctor consultations, NABL-certified lab tests, health checkup packages, home sample collection and an online pharmacy with doorstep delivery.",
+    "Kist Poly Clinic in Balkumari, Lalitpur offers doctor consultations, NABL-certified lab tests, health checkup packages, home sample collection and an online pharmacy with doorstep delivery.",
   locale: "en_NP",
   telephone: "+977-01-5202097",
   email: "kistpolyclinic@gmail.com",
   address: {
-    street: "Balkumari-Kharibot",
+    /**
+     * `street` matches the Google Business Profile exactly. `area` is the
+     * neighbourhood locals actually navigate by - Google stores only the
+     * street, but nobody in Balkumari asks for "Boje Pokhari Marga". Both are
+     * emitted together in `streetAddress` so the listing still matches while
+     * the address stays recognisable to a human reader.
+     */
+    street: "Boje Pokhari Marga",
+    area: "Balkumari-Kharibot",
     locality: "Lalitpur",
     region: "Bagmati Province",
+    postalCode: "44700",
     country: "NP",
+    /** Nearest well-known landmark, for directions copy. */
+    landmark: "near Balkumari Temple",
   },
   geo: {
     latitude: 27.670335,
@@ -50,6 +61,20 @@ export const siteConfig = {
 
 export const absoluteUrl = (path = "/") =>
   `${siteConfig.url}${path.startsWith("/") ? path : `/${path}`}`;
+
+/**
+ * The address as a human reads it. Use this everywhere the address is shown -
+ * footer, contact page, metadata descriptions - so there is exactly one
+ * wording of it on the site.
+ */
+export const formattedAddress = [
+  siteConfig.address.area,
+  siteConfig.address.street,
+  `${siteConfig.address.locality} ${siteConfig.address.postalCode}`,
+].join(", ");
+
+/** Short form for tight spaces such as the footer. */
+export const shortAddress = `${siteConfig.address.area}, ${siteConfig.address.locality}`;
 
 type PageMetaInput = {
   title: string;
@@ -107,9 +132,12 @@ export function pageMetadata({
 
 const postalAddress = {
   "@type": "PostalAddress",
-  streetAddress: siteConfig.address.street,
+  // Street first so the string still leads with what Google has on file, then
+  // the neighbourhood that makes it findable on the ground.
+  streetAddress: `${siteConfig.address.street}, ${siteConfig.address.area}`,
   addressLocality: siteConfig.address.locality,
   addressRegion: siteConfig.address.region,
+  postalCode: siteConfig.address.postalCode,
   addressCountry: siteConfig.address.country,
 };
 

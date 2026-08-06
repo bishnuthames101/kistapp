@@ -6,7 +6,7 @@ import { pageMetadata } from "@/lib/seo"
 
 export const metadata = pageMetadata({
   title: "Admin",
-  description: "Restricted staff area for KIST Poly Clinic.",
+  description: "Restricted staff area for Kist Poly Clinic.",
   path: "/admin",
   noIndex: true,
 })

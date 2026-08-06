@@ -5,7 +5,7 @@ import { pageMetadata } from '@/lib/seo';
 
 export const metadata = pageMetadata({
   title: 'Patient Login',
-  description: 'Sign in to your KIST Poly Clinic account to manage appointments, lab tests and pharmacy orders.',
+  description: 'Sign in to your Kist Poly Clinic account to manage appointments, lab tests and pharmacy orders.',
   path: '/login',
   noIndex: true,
 });

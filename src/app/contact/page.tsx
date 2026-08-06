@@ -1,13 +1,13 @@
 import { Mail, Phone, MapPin } from 'lucide-react';
 
-import { pageMetadata } from '@/lib/seo';
+import { pageMetadata, siteConfig, formattedAddress } from '@/lib/seo';
 
 export const metadata = pageMetadata({
   title: 'Contact Us',
   description:
-    'Contact KIST Poly Clinic, Balkumari-Kharibot, Lalitpur. Call +977-01-5202097 or email kistpolyclinic@gmail.com to book an appointment. Open Sunday to Saturday, 7 AM to 8 PM.',
+    `Contact Kist Poly Clinic, ${formattedAddress}. Call ${siteConfig.telephone} or email ${siteConfig.email} to book an appointment. Open Sunday to Saturday, 7 AM to 8 PM.`,
   path: '/contact',
-  keywords: ['KIST Poly Clinic contact', 'clinic phone number Lalitpur', 'book appointment Lalitpur'],
+  keywords: ['Kist Poly Clinic contact', 'clinic phone number Lalitpur', 'book appointment Lalitpur'],
 });
 
 export default function ContactPage() {
@@ -70,7 +70,8 @@ export default function ContactPage() {
                   <MapPin className="w-5 h-5 text-blue-600 mt-1 mr-3" />
                   <div>
                     <h3 className="font-medium">Address</h3>
-                    <p className="text-gray-600">Balkumari-Kharibot, Lalitpur, Nepal</p>
+                    <p className="text-gray-600">{formattedAddress}, Nepal</p>
+                    <p className="text-sm text-gray-500">{siteConfig.address.landmark}</p>
                   </div>
                 </div>
                 <div className="flex items-start">

@@ -1,5 +1,6 @@
 import { Phone, Mail, MapPin, Clock, Facebook, Instagram} from 'lucide-react';
 import { FaTiktok } from 'react-icons/fa';
+import { siteConfig } from '@/lib/seo';
 
 export default function Footer() {
   return (
@@ -8,7 +9,7 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* About */}
           <div>
-            <h3 className="text-xl font-bold text-white mb-4">KIST Poly Clinic</h3>
+            <h3 className="text-xl font-bold text-white mb-4">Kist Poly Clinic</h3>
             <p className="mb-4">Providing quality healthcare services with modern facilities and experienced professionals.</p>
             <div className="flex space-x-4">
               <a href="https://www.facebook.com/share/16mp3AtNCs/?mibextid=wwXIfr" className="hover:text-blue-400"><Facebook size={20} /></a>
@@ -44,7 +45,11 @@ export default function Footer() {
               </li>
               <li className="flex items-start">
                 <MapPin size={16} className="mr-2 mt-1" />
-                <span>Balkumari-Kharibot,<br />Lalitpur, Nepal</span>
+                <span>
+                  {siteConfig.address.area}, {siteConfig.address.street}
+                  <br />
+                  {siteConfig.address.locality} {siteConfig.address.postalCode}, Nepal
+                </span>
               </li>
             </ul>
           </div>
@@ -62,7 +67,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gray-800 mt-12 pt-8 text-center">
-          <p>&copy; {new Date().getFullYear()} KIST Poly Clinic. All rights reserved.</p>
+          <p>&copy; {new Date().getFullYear()} Kist Poly Clinic. All rights reserved.</p>
           {/* Admin link */}
           <div className="mt-4">
             <a

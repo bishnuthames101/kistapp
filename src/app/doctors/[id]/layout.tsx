@@ -29,7 +29,7 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: `${doctor.name} - ${doctor.specialty}`,
-    description: `${doctor.name}, ${doctor.specialty} at KIST Poly Clinic, Lalitpur. ${doctor.education}, ${doctor.experience} of experience. NMC No. ${doctor.nmcNumber}. Consultation fee Rs. ${doctor.opdCharge}.`,
+    description: `${doctor.name}, ${doctor.specialty} at Kist Poly Clinic, Lalitpur. ${doctor.education}, ${doctor.experience} of experience. NMC No. ${doctor.nmcNumber}. Consultation fee Rs. ${doctor.opdCharge}.`,
     path: `/doctors/${doctor.id}`,
     // Only local images can be used as social cards; remote stock photos are skipped.
     images: doctor.image.startsWith("/") ? [doctor.image] : undefined,

@@ -2,7 +2,7 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
   title: "Staff Login",
-  description: "Restricted staff sign-in for KIST Poly Clinic.",
+  description: "Restricted staff sign-in for Kist Poly Clinic.",
   path: "/admin-login",
   noIndex: true,
 });

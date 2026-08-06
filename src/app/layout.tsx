@@ -32,7 +32,7 @@ export const metadata: Metadata = {
     "online pharmacy Nepal",
     "home sample collection Lalitpur",
     "Balkumari clinic",
-    "KIST Poly Clinic",
+    "Kist Poly Clinic",
   ],
   authors: [{ name: siteConfig.name, url: siteConfig.url }],
   creator: siteConfig.name,

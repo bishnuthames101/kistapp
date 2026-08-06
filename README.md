@@ -1,6 +1,6 @@
-# KIST Poly Clinic - Next.js Frontend
+# Kist Poly Clinic - Next.js Frontend
 
-This is the Next.js version of the KIST Poly Clinic frontend application, migrated from React + Vite.
+This is the Next.js version of the Kist Poly Clinic frontend application, migrated from React + Vite.
 
 ## Features
 
@@ -199,7 +199,7 @@ ISC
 
 ## Contact
 
-KIST Poly Clinic
+Kist Poly Clinic
 - Phone: +977-01-5202097
 - Email: kistpolyclinic@gmail.com
 - Address: Balkumari-Kharibot, Lalitpur, Nepal

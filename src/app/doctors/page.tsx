@@ -8,7 +8,7 @@ import { absoluteUrl, breadcrumbJsonLd, pageMetadata, physicianJsonLd } from '@/
 export const metadata = pageMetadata({
   title: 'Our Doctors',
   description:
-    'Meet the doctors at KIST Poly Clinic, Lalitpur - physicians, surgeons, orthopedic, gynecology, neurology, endocrinology and radiology specialists. View schedules and consultation fees.',
+    'Meet the doctors at Kist Poly Clinic, Lalitpur - physicians, surgeons, orthopedic, gynecology, neurology, endocrinology and radiology specialists. View schedules and consultation fees.',
   path: '/doctors',
   keywords: ['doctors in Lalitpur', 'best physician Lalitpur', 'specialist doctor Nepal', 'NMC registered doctors'],
 });
@@ -21,7 +21,7 @@ export default function DoctorsPage() {
   const doctorListJsonLd = {
     '@context': 'https://schema.org',
     '@type': 'ItemList',
-    name: 'Doctors at KIST Poly Clinic',
+    name: 'Doctors at Kist Poly Clinic',
     itemListElement: doctors.map((doctor, index) => ({
       '@type': 'ListItem',
       position: index + 1,

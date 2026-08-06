@@ -29,7 +29,7 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: `${test.name} - Rs. ${test.price.toLocaleString()}`,
-    description: `${test.description} Results in ${test.turnaroundTime}. ${test.requirements}. Book at KIST Poly Clinic, Lalitpur for Rs. ${test.price.toLocaleString()}.`,
+    description: `${test.description} Results in ${test.turnaroundTime}. ${test.requirements}. Book at Kist Poly Clinic, Lalitpur for Rs. ${test.price.toLocaleString()}.`,
     path: `/lab-tests/test/${test.id}`,
     keywords: [test.name, `${test.name} price Nepal`, `${test.name} Lalitpur`],
   });

@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 export const metadata = pageMetadata({
   title: "Health Checkup Packages",
   description:
-    "Compare full body checkups, diabetes, heart, hormone, fertility and cancer screening packages at KIST Poly Clinic, Lalitpur. NABL-certified lab with home sample collection.",
+    "Compare full body checkups, diabetes, heart, hormone, fertility and cancer screening packages at Kist Poly Clinic, Lalitpur. NABL-certified lab with home sample collection.",
   path: "/lab-tests/packages",
   keywords: [
     "health checkup package Nepal",

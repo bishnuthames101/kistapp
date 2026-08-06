@@ -2,7 +2,7 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
   title: "Reset Your Password",
-  description: "Request a password reset link for your KIST Poly Clinic account.",
+  description: "Request a password reset link for your Kist Poly Clinic account.",
   path: "/forgot-password",
   noIndex: true,
 });

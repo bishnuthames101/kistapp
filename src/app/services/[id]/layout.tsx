@@ -34,7 +34,7 @@ export async function generateMetadata({
 
   return pageMetadata({
     title: `${service.name} in Lalitpur - Rs. ${service.price.toLocaleString()}`,
-    description: `${service.description} Available at KIST Poly Clinic, Balkumari, Lalitpur from Rs. ${service.price.toLocaleString()}. Book an appointment today.`,
+    description: `${service.description} Available at Kist Poly Clinic, Balkumari, Lalitpur from Rs. ${service.price.toLocaleString()}. Book an appointment today.`,
     path: `/services/${service.id}`,
     keywords: [
       service.name,

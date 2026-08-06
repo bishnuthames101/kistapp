@@ -329,7 +329,7 @@ export default function HomePage() {
       <section className="py-20 bg-gradient-to-br from-blue-600 to-purple-700 text-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold mb-4">Why Choose KIST Poly Clinic?</h2>
+            <h2 className="text-4xl font-bold mb-4">Why Choose Kist Poly Clinic?</h2>
             <p className="text-xl text-blue-100 max-w-3xl mx-auto">
               We combine medical excellence with compassionate care to deliver the best healthcare experience
             </p>
@@ -421,7 +421,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 leading-relaxed">
-                "Excellent service and very professional staff. The doctors are knowledgeable and caring. I highly recommend KIST Poly Clinic for all your healthcare needs."
+                "Excellent service and very professional staff. The doctors are knowledgeable and caring. I highly recommend Kist Poly Clinic for all your healthcare needs."
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">

@@ -5,9 +5,9 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata = pageMetadata({
   title: 'About Us',
   description:
-    'KIST Poly Clinic has served Balkumari, Lalitpur since 2067 BS with modern facilities, experienced doctors and a NABL-certified laboratory. Learn about our mission and values.',
+    'Kist Poly Clinic has served Balkumari, Lalitpur since 2067 BS with modern facilities, experienced doctors and a NABL-certified laboratory. Learn about our mission and values.',
   path: '/about',
-  keywords: ['about KIST Poly Clinic', 'clinic in Balkumari Lalitpur', 'trusted clinic Nepal'],
+  keywords: ['about Kist Poly Clinic', 'clinic in Balkumari Lalitpur', 'trusted clinic Nepal'],
 });
 
 export default function AboutPage() {
@@ -15,7 +15,7 @@ export default function AboutPage() {
     {
       id: 1,
       name: "Sarah Johnson",
-      text: "The care I received at KIST Poly Clinic was exceptional. The staff was professional and caring.",
+      text: "The care I received at Kist Poly Clinic was exceptional. The staff was professional and caring.",
       image: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?auto=format&fit=crop&q=80&w=150&h=150"
     }
   ];
@@ -27,9 +27,9 @@ export default function AboutPage() {
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <div className="glass-card p-8 mb-12">
-              <h1 className="text-4xl font-bold text-gray-800 mb-6">About KIST Poly Clinic</h1>
+              <h1 className="text-4xl font-bold text-gray-800 mb-6">About Kist Poly Clinic</h1>
               <p className="text-lg text-gray-600">
-                KIST Poly Clinic has been serving the community of Lalitpur and beyond since its establishment.
+                Kist Poly Clinic has been serving the community of Lalitpur and beyond since its establishment.
                 Our state-of-the-art facility combines modern medical technology with compassionate care to
                 provide the best possible healthcare services to our patients.
               </p>
@@ -72,7 +72,7 @@ export default function AboutPage() {
               <div>
                 <h2 className="text-3xl font-bold text-gray-800 mb-6">Message from the Chairperson</h2>
                 <p className="text-gray-600 mb-6">
-                  &quot;As the founder and chairperson of KIST Poly Clinic, I am deeply committed to our mission
+                  &quot;As the founder and chairperson of Kist Poly Clinic, I am deeply committed to our mission
                   of providing exceptional healthcare services to our community. Our journey began with a
                   vision to create a medical facility that combines advanced technology with compassionate care.&quot;
                 </p>
