@@ -1,124 +1,232 @@
-My honest POV: the app feels vague because it is structurally incoherent
+# Kist Poly Clinic — findings and remaining work
 
-It isn't a lack of features. There are 86 pages, a real Postgres schema, NextAuth, Supabase storage, rate limiting, and a genuinely good SEO layer. The problem is that three different applications are layered on top of each other and none of them was finished:
+Status as of 2026-08-06.
 
-1. A static marketing site (services, doctors, lab packages — all hardcoded in src/data/*.ts)
-2. A half-migrated Django client (src/services/api.ts, snake_case, localStorage JWTs)
+**Done:** items 1–7 (the "this week" batch). Shipped in commits `526d166` and
+`618e5dc`, on top of `16ffbc7` (security + SEO + branding), `b4db0b0`
+(name/address), `80e5c56` (landmark + map), `a0d3509` (social profiles).
+
+**Left:** items 8–15. Item 11's prescription-bucket audit is the only one that
+is a live data-exposure risk rather than a quality problem — do that one first.
+
+**Not yet verified by a human:** nobody has clicked through the fixed flows on
+the live site. Typecheck and build pass, but there is still no test suite
+(item 12). Smoke-test before building on top of this.
+
+---
+
+## The original diagnosis (still accurate, kept for context)
+
+The app felt vague because it was structurally incoherent. Three applications
+were layered on top of each other and none was finished:
+
+1. A static marketing site (services, doctors, lab packages — hardcoded in `src/data/*.ts`)
+2. A half-migrated Django client (`src/services/api.ts`, snake_case, localStorage JWTs)
 3. A new Next.js/Prisma backend (camelCase, cookie sessions, paginated envelopes)
 
-Nobody reconciled the seams. That's what "vague" is: you click Book, get a green toast, and nothing you can see ever confirms it happened.
+Nobody reconciled the seams. Items 1–7 reconciled them. Items 8–15 are about
+the domain model and the product, not the seams.
 
 ---
-P0 — Core user journeys are broken in production
 
-These are not style opinions. They are runtime failures I traced from caller to route.
+## DONE
 
-1. The patient dashboard is non-functional — 3 of its 4 tabs.
+### ✅ 1. One shared response contract (was P0 #1 and #2)
 
-Every list API returns a pagination envelope:
-// src/app/api/appointments/route.ts:45
-return NextResponse.json({ data: appointments, total, page, totalPages })
-Every consumer still treats the body as a bare array:
-// src/app/dashboard/page.tsx:98-102
-const allAppointments = response.data;          // = { data: [...], total, ... }
-const upcoming = allAppointments.filter(...)    // TypeError
-The catch swallows it and renders "Failed to load appointments. Please try again later." Same bug in src/components/PharmacyOrdersSection.tsx:22-23 and the Lab Tests tab. A patient can never see a booking they made. That is the entire value proposition of having an account.
+Every list route returned `{data,total,page,totalPages}` while every consumer
+treated the body as a bare array. The patient dashboard showed "Failed to load"
+on three of four tabs; the admin appointments, lab-test, order and medicine
+pages threw during render. The lab-test route also hand-converted rows to
+snake_case, so the admin page and the dashboard disagreed on field names.
 
-2. The admin panel crashes on load — same root cause, worse failure mode.
+- All collection endpoints now return the same envelope (`src/lib/serialize.ts`).
+  Prescriptions gained the envelope and pagination.
+- Dropped the snake_case transform from `/api/laboratory-tests`.
+- Prisma `Decimal` → number and `@db.Date` → `"YYYY-MM-DD"` at the edge, which
+  deleted a lot of `typeof x === 'string' ? parseFloat(x) : x`.
+- New `src/lib/api-client.ts`. `getList` unwraps the envelope and throws a named
+  `ApiShapeError` when a response is not the expected shape — the guard that
+  would have caught this the day it was introduced.
+- Rewrote `src/services/api.ts` with types that match what the server sends.
+  Removed the dead Django endpoints, the localStorage bearer token, and the 401
+  interceptor that hard-redirected and wiped the cart.
+- Fixed the dashboard, `PharmacyOrdersSection`, and all four admin pages.
 
-src/app/admin/appointments/page.tsx:43, src/app/admin/lab-tests/page.tsx, and src/app/admin/orders/page.tsx:16-17 all do setState(response.data) then .map() / .filter() on it. There's no try/catch around the render, so this throws during render → error boundary / white screen. The clinic cannot see or confirm a single booking. Combined with #1, appointments go into the database and are seen by no human being.
+### ✅ 2. Pharmacy checkout (was P0 #3)
 
-3. Pharmacy checkout always fails — 100% failure rate.
+Failed 100% of the time: the client sent snake_case Django fields, Zod stripped
+them, every order 400'd with "Medicine ID or name is required".
 
-The client sends the old Django payload:
-// src/app/epharmacy/page.tsx:57-66
-{ patient_id, medicine_name, price_per_unit, total_amount, delivery_address, ... }
-The route validates camelCase and Zod silently strips unknown keys:
-// src/app/api/pharmacy-orders/route.ts:55-61
-z.object({ medicineId: ..., medicineName: ..., deliveryAddress: ... })
-medicineName and medicineId both land as undefined → 400 "Medicine ID or name is required" on every order. Not a single medicine can be bought.
+- Sends `medicineId` + `quantity`; the server prices the order.
+- Reports partial failures ("Ordered 3 of 5 items") instead of claiming success,
+  and keeps failed items in the cart so a retry cannot double-order.
+- Unified the duplicate `Medicine` type whose `stock` values (`'In Stock'`)
+  never matched the server enum (`'IN_STOCK'`).
+- Add to Cart is disabled for out-of-stock medicines.
 
-4. Two competing auto-logout systems fight each other, and the aggressive one wins.
+### ✅ 3. Inactivity timeouts (was P0 #4)
 
-- src/contexts/AuthContext.tsx:83-91 — silent logout at 90 s, no warning, for everyone.
-- src/components/InactivityMonitor.tsx:19 — warning modal at 105 s, logout at 120 s for patients.
+Three mechanisms disagreed and the harshest won: a silent 90s timer in
+`AuthContext` always fired before `InactivityMonitor`'s warning, so the "Session
+about to expire" modal was unreachable.
 
-The AuthContext timer fires first, so the "Session about to expire — Stay logged in?" modal is dead code for patients. Real effect: read a doctor's profile for 91 seconds and you are logged out mid-booking, with no explanation. For a clinic site where users read about procedures, this is the single most destructive UX decision in the codebase. did.md flagged it as "confirm this is intentional" — my answer is an unqualified no. 15–30 minutes is the norm; 90 seconds is what you'd use for a banking terminal, and even then you'd warn.
+- Deleted the silent timer; `InactivityMonitor` is the sole owner.
+- One policy in `src/lib/session-policy.ts`, shared with the NextAuth jwt
+  callback (which had its own hardcoded copy). **20 min patients, 15 min staff**,
+  warning 60s before. Change it there if you disagree.
+- Timeout enforced on every token read, not only on an explicit `update()`.
+- Server-side timestamp refreshes at most once every 2 minutes; it previously
+  fired a session write and a throttled DB read every 5 seconds of mouse movement.
 
-Also note the mousemove listener calls update() every 5 s (InactivityMonitor.tsx:82-93), firing a session refresh — and a throttled DB read in the JWT callback — continuously while anyone moves a mouse.
+### ✅ 4. Booking modals
+
+All five were hand-rolled overlays with `pointer-events-none` — no scrim, no
+dimming, page still scrollable and clickable behind them.
+
+- New `src/components/Modal.tsx`: backdrop, Escape, focus trap, scroll lock,
+  `role="dialog"`, focus restored on close. All five dialogs use it.
+
+### ✅ 5. Pharmacy search box
+
+Was bound to state nothing ever read. Now a debounced search against
+`/api/medicines?search=`, rendering results in place of the category browse.
+
+### ✅ 6. Navigation
+
+Added Doctors, About and Contact to the navbar (desktop and mobile) — they were
+reachable only from the footer. Also closed the account dropdown on outside
+click and Escape.
+
+### ✅ 7. "Cash on Delivery" on consultations
+
+Now "Pay at the clinic on the day of your visit".
+
+### ✅ Bonus — found while fixing the above
+
+- **`/doctors/[id]` Book Appointment created nothing.** `handleFinalConfirmation`
+  showed "Appointment booked successfully!" and never called the API. Not a
+  payload bug — there was no request at all. Now creates the appointment.
+- Catch blocks inspecting `error.response` (an axios shape that no longer
+  exists) replaced, so failures show a real message.
+- Category pages had no cart button — items vanished into a UI you could not
+  reach from that page. Added a cart link.
 
 ---
-P1 — The domain model doesn't model the business
 
-This is the deeper reason the product feels thin, and no amount of UI polish fixes it.
+## LEFT TO DO
 
-There is no Doctor table. Doctors live in src/data/doctors.ts. Appointment stores doctorName as a free-text string (prisma/schema.prisma:99). Consequences:
+### 🔴 11a. Audit the Supabase prescription bucket — DO THIS FIRST
 
-- No availability, no capacity, no conflict detection. src/app/services/[id]/page.tsx:13-24 generates 10:00–16:00 slots for every doctor on every date, from a hardcoded loop. Fifty patients can book Dr. Shah at 10:00 on the same Saturday and all get "Appointment booked successfully!". Meanwhile the doctor's actual schedule is displayed one card above as decorative text (doctor.schedule).
+Prescription images are served via `getPublicUrl`. If the bucket is public,
+anyone holding the URL can read a patient's prescription with no
+authentication. This is a PHI exposure, not a code-quality issue, and it is
+live right now. Fix is `createSignedUrl` with a short TTL, which also touches
+the admin and dashboard read paths. **Check the bucket ACLs before anything else.**
+
+### 8. Doctor and DoctorSlot tables
+
+There is no `Doctor` table. Doctors live in `src/data/doctors.ts` and
+`Appointment` stores `doctorName` as free text (`prisma/schema.prisma:99`).
+
+- No availability, capacity or conflict detection.
+  `src/app/services/[id]/page.tsx` generates 10:00–16:00 slots for every doctor
+  on every date from a hardcoded loop. Fifty patients can book the same doctor
+  at the same time and all get "booked successfully". The doctor's real schedule
+  is displayed one card above as decorative text.
 - Rename a doctor and every historical appointment silently detaches.
-- The doctor's opdCharge is shown at confirmation but never persisted — the appointment carries no price at all.
+- `opdCharge` is shown at confirmation but never persisted — appointments carry
+  no price.
 
-There is no Order, only PharmacyOrder line items. A 5-item cart becomes 5 unrelated rows in a for loop (src/app/epharmacy/page.tsx:56-67). No order ID, no single total, no shipping record — and if item 3 fails, items 1–2 are already committed with no rollback. The dashboard's "Order Details" table is hardcoded to render exactly one row.
+Generate slots from real schedules; enforce uniqueness on (doctor, date, time).
+Without this the booking feature is theatre.
 
-Stock is a boolean enum, not a quantity. StockStatus { IN_STOCK | OUT_OF_STOCK } — no decrement on order, so overselling is guaranteed.
+### 9. Order header with OrderItem children
 
-Nothing notifies anyone. resend is a dependency; no appointment confirmation, no reminder, no status-change email or SMS is ever sent. In Nepal, for a clinic, SMS confirmation isn't a nice-to-have — it's the reason a patient trusts the booking. Right now the booking exists only in a database nobody can read (see P0 #1 and #2).
+A 5-item cart is still 5 unrelated `PharmacyOrder` rows. No order ID, no single
+total, no shipping record. Create in one `prisma.$transaction`. The dashboard's
+"Order Details" table is hardcoded to render exactly one row.
 
-Password reset is a dead endpoint. /forgot-password POSTs to http://127.0.0.1:8000/api/password-reset/ and displays "reset link has been sent" regardless. Users who forget a password are permanently locked out.
+Related: **stock is a boolean enum**, not a quantity
+(`StockStatus { IN_STOCK | OUT_OF_STOCK }`), with no decrement on order, so
+overselling is guaranteed.
+
+### 10. Confirmation email + SMS
+
+`resend` is already a dependency. Nothing notifies anyone — no booking
+confirmation, no reminder, no status-change message. In Nepal, for a clinic,
+SMS confirmation is the reason a patient trusts the booking.
+
+### 11b. Real password reset
+
+`/forgot-password` POSTs to `http://127.0.0.1:8000/api/password-reset/` — a dead
+Django endpoint — and shows "reset link has been sent" regardless. Users who
+forget a password are permanently locked out. Needs a reset-token table
+(Prisma migration) + `resend`.
+
+### 12. Tests and CI
+
+Zero tests, zero CI. A single integration test on "book → view in dashboard"
+would have caught items 1, 2 and 3 in one run.
+
+- Playwright smoke test: register → book appointment → see it in dashboard →
+  admin confirms → patient sees "confirmed".
+- Run it in GitHub Actions on every push.
+- **Linting is also broken:** `npm run lint` calls `next lint`, removed in
+  Next 16, and ESLint 9 needs a flat `eslint.config.js` while this project has
+  `.eslintrc.json`. Fix alongside CI.
+
+### 13. Commit to one visual system
+
+`globals.css` defines a complete glass-morphism vocabulary (20+ tokens). The
+homepage uses none of it — solid gradients and hand-rolled Tailwind.
+`/epharmacy` is fully glass. `/dashboard` is flat white cards. `/admin` is
+unstyled tables. Users cross three visual identities in four clicks. This is the
+biggest remaining driver of "feels vague."
+
+Recommendation: delete the glass system — frosted glass over gradients is poor
+for medical text legibility and contrast. Then rebuild the dashboard and admin
+against whatever you pick. The admin panel is unstyled scaffolding and it is
+where staff live all day.
+
+### 14. Replace or substantiate the trust claims
+
+- "15,000+ Happy Patients", "50+ Expert Doctors" — while `/doctors` lists 9,
+  contradicting the claim on the same site.
+- A hardcoded "4.8 ★" on every lab package.
+- Three testimonials with stock names and no source.
+- **"NABL Certified"** — NABL is an *Indian* accreditation body. For a Nepali
+  clinic this is very likely wrong, and it is the kind of claim a regulator or
+  a competitor will check. It currently appears on the homepage, in the site
+  description, and in the JSON-LD.
+
+### 15. Reviews: build or remove
+
+`DoctorRating` accepts `reviews` and `canReview` props and renders a review form
+that submits nowhere. Either build it (schema + endpoint) or delete it.
 
 ---
-UI/UX findings
 
-Two design systems, neither committed to. globals.css defines a complete glass-morphism vocabulary — .glass-card, .glass-button, .glass-modal, .glass-table, 20+ tokens. The homepage (src/app/page.tsx) uses none of it — it's solid blue/purple gradients with shadow-2xl and hand-rolled Tailwind. /epharmacy is fully glass. /dashboard is flat white Bootstrap-ish cards. /admin is unstyled tables. Users cross three visual identities in four clicks. This is the #1 driver of "feels vague." Pick one — I'd delete the glass system; frosted glass over gradients is poor for medical text legibility and contrast.
+## Smaller things noticed, not yet done
 
-Booking modals have no backdrop and don't trap the page.
-// src/app/services/[id]/page.tsx:203  (also doctors/[id], lab-tests/package/[id])
-<div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-pointer-events-none on the overlay means no scrim, no dimming, and the page behind stays scrollable and clickable. The modal appears to float, disconnected. No Escape handler, no focus trap, no role="dialog", no scroll lock. It reads as a rendering glitch rather than a step in a flow.
-
-The pharmacy search box does nothing. searchQuery at src/app/epharmacy/page.tsx:19 is bound to the input and never read again — no filter, no API call. It's a prominent, fully-styled dead control.
-
-The cart is memory-only. CartContext.tsx:18 uses plain useState — no localStorage, no server persistence. Refresh, navigate away and back, or get auto-logged-out at 90 s (see above) and the cart silently empties. Worse: /epharmacy/category/[category] lets you add to cart but has no cart button and no checkout — items vanish into a UI you can't reach from that page.
-
-Navigation omits half the site. Navbar.tsx:42-52 links Home, Services, Lab Tests, ePharmacy. /doctors, /about, and /contact are reachable only from the footer — despite /doctors being the highest-intent page on a clinic site and carrying full Physician JSON-LD. Google can find your doctors; your visitors can't.
-
-Copy-paste errors that destroy credibility. The doctor appointment confirmation modal displays "Payment Method: Cash on Delivery" for an in-clinic consultation (src/app/doctors/[id]/page.tsx). The service booking says "Pay on Visit." Same flow, two answers, one nonsensical.
-
-Unverifiable trust claims. "15,000+ Happy Patients", "50+ Expert Doctors", "NABL Certified", a hardcoded "4.8 ★" on every lab package, and three testimonials with stock names and no source — while /doctors lists 9 doctors, contradicting the 50+ claim on the same site. NABL is an Indian accreditation body; for a Nepali clinic this is very likely wrong and is the kind of claim a regulator or a competitor will check. The DoctorRating component accepts reviews and canReview props and renders a review form that submits nowhere.
-
-Accessibility. No skip link, no focus trapping, modals lack ARIA roles, the Navbar user dropdown has no click-outside/Escape handling, several <img> tags bypass next/image (page.tsx:105, epharmacy, doctor avatars) so there's no lazy-loading or CLS protection on the hero.
+- `src/types/pharmacyOrder.ts` describes an order shape that does not exist
+  (`items: CartItem[]`, `orderDate`) — dead, will mislead. Delete with item 9.
+- The cart is memory-only (`CartContext` uses plain `useState`): refresh or
+  navigate away and it empties. Persist to localStorage.
+- `<img>` instead of `next/image` in several places (homepage hero, epharmacy
+  cards, doctor avatars) — no lazy-loading or CLS protection.
+- No skip link; several pages still lack landmark regions.
+- `middleware.ts` should be renamed to `proxy.ts` (Next 16 deprecation warning
+  on every build).
+- Facebook page is named "Kist Polyclinic And Medical Center Pvt.Ltd." —
+  "Polyclinic" as one word, a fourth spelling variant. Site, logo and GBP now
+  agree on "Kist Poly Clinic".
+- GBP business description has typos: "all kinds **pf** services", lowercase
+  "kist poly clinic" and "balkumari-kharibot", "Xray"/"Ecg" → "X-ray"/"ECG".
 
 ---
-Engineering process — why these bugs survive
 
-- Zero tests. Zero CI. No *.test.*, no vitest/jest/playwright, no .github/. A single integration test on "book → view in dashboard" catches P0 #1, #2 and #3 in one run.
-- TypeScript gives false confidence. did.md reports "tsc --noEmit — clean," and it is. But api.ts:187 declares api.get<Appointment[]>('/appointments') — a hand-written lie about a shape the compiler cannot check, and the admin pages use bare axios.get() returning any. The types are decoration, not verification. Derive client types from the Prisma/Zod schemas, or use zod to parse responses, and these become compile-time errors.
-- Three naming conventions in one request path. Prisma camelCase → laboratory-tests/route.ts:46-59 hand-transforms to snake_case → the dashboard reads camelCase → all undefined. The lab-test admin page reads snake_case and works; the patient dashboard reads camelCase and doesn't. Nobody can hold this in their head.
-- src/services/api.ts is a live hazard, not dead code. did.md calls it "dead legacy" — that's wrong, and the error matters: dashboard/page.tsx, services/[id]/page.tsx, epharmacy/page.tsx and others import from it today. It still injects localStorage bearer tokens (ignored), and its 401 interceptor does a hard window.location.href = '/login', blowing away React state including the cart.
-- A "security & SEO" pass shipped without a smoke test. The pagination envelope that broke every consumer was almost certainly added during that hardening work. did.md verifies sitemap.xml, robots.txt, and JSON-LD render correctly — meticulously — but never once logged in and clicked "Book Appointment." Verification aimed at crawlers, not patients.
-
----
-What I'd do, in order
-
-This week — make the product true.
-1. One shared response contract. Either drop the envelope or fix all consumers, and add a typed apiFetch<T> that parses with Zod. Kills P0 #1 and #2.
-2. Fix the pharmacy payload to camelCase (P0 #3).
-3. Raise inactivity timeout to 20 min, delete the duplicate timer in AuthContext, keep the warning modal (P0 #4).
-4. Give the booking modals a real backdrop, Escape, focus trap, scroll lock.
-5. Delete the pharmacy search box or wire it to medicines.search.
-6. Add /doctors, /about, /contact to the navbar.
-7. Fix "Cash on Delivery" on consultations.
-
-This month — make it a system.
-8. Doctor and DoctorSlot tables; generate slots from real schedules; enforce uniqueness on (doctor, date, time). Without this the booking feature is theatre.
-9. An Order header with OrderItem children, created in one prisma.$transaction.
-10. Confirmation email + SMS on booking and on status change. This is what makes the app feel real to a patient.
-11. Real password reset (token table + resend), and audit the Supabase prescription bucket — did.md correctly flags that patient prescription images may be on unauthenticated public URLs. Check that today; it's a PHI exposure, not a code-quality issue.
-12. Playwright smoke test: register → book appointment → see it in dashboard → admin confirms it → patient sees "confirmed". Run it in GitHub Actions on every push.
-
-Then — make it feel like one product.
-13. Commit to one visual system and rebuild the dashboard and admin against it. The admin panel is currently unstyled scaffolding and it's where staff live all day.
-14. Replace or substantiate the invented stats, testimonials, star ratings, and the NABL claim.
-15. Either build real reviews (schema + endpoint) or remove DoctorRating.
-
-The good news: the foundation is sound. The schema is well-indexed, ownership checks are consistently applied on per-resource routes, prices are correctly re-read server-side, and the SEO/structured-data layer is genuinely above average for a clinic site. What's missing is the connective tissue and someone clicking through the app as a patient. Items 1–7 are roughly a week of work and will change the product from "vague" to "works."
+The foundation is sound: the schema is well-indexed, ownership checks are
+consistent on per-resource routes, prices are re-read server-side, and the
+SEO/structured-data layer is above average for a clinic site. Items 1–7 turned
+"vague" into "works". Items 8–10 are what turn "works" into a product a patient
+trusts.
