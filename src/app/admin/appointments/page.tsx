@@ -1,28 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
 import { format } from 'date-fns';
 import { Calendar, Clock, User, Phone, CheckCircle, XCircle, Search, Stethoscope } from 'lucide-react';
-
-interface Appointment {
-  id: string;
-  doctorName: string;
-  doctorSpecialization: string;
-  appointmentDate: string | Date;
-  appointmentTime: string;
-  status: string;
-  reason?: string;
-  notes?: string;
-  patient?: {
-    id: string;
-    name: string;
-    phone: string;
-    email: string;
-  };
-  createdAt?: string;
-  updatedAt?: string;
-}
+import { appointments as appointmentsApi, errorMessage, type Appointment } from '@/services/api';
 
 export default function AdminAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -39,12 +20,11 @@ export default function AdminAppointmentsPage() {
   const fetchAppointments = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/appointments');
-      setAppointments(response.data);
-      setLoading(false);
+      setAppointments(await appointmentsApi.list({ limit: 200 }));
     } catch (err) {
       console.error('Error fetching appointments:', err);
-      setError('Failed to load appointments');
+      setError(errorMessage(err, 'Failed to load appointments'));
+    } finally {
       setLoading(false);
     }
   };
@@ -52,18 +32,17 @@ export default function AdminAppointmentsPage() {
   const updateAppointmentStatus = async (appointmentId: string, newStatus: string) => {
     try {
       setUpdatingAppointmentId(appointmentId);
-      await axios.patch(`/api/appointments/${appointmentId}`, {
-        status: newStatus,
+      const updated = await appointmentsApi.update(appointmentId, {
+        status: newStatus as Appointment['status'],
       });
 
-      // Update local state
-      setAppointments(appointments.map(apt =>
-        apt.id === appointmentId ? { ...apt, status: newStatus } : apt
-      ));
-      setUpdatingAppointmentId(null);
+      setAppointments((current) =>
+        current.map((apt) => (apt.id === appointmentId ? { ...apt, ...updated } : apt))
+      );
     } catch (err) {
       console.error('Error updating appointment status:', err);
-      alert('Failed to update appointment status');
+      alert(errorMessage(err, 'Failed to update appointment status'));
+    } finally {
       setUpdatingAppointmentId(null);
     }
   };

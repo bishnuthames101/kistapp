@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { pharmacyOrders, errorMessage, type PharmacyOrder } from "@/services/api"
 
 export default function AdminOrders() {
-  const [orders, setOrders] = useState([])
+  const [orders, setOrders] = useState<PharmacyOrder[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -12,11 +13,10 @@ export default function AdminOrders() {
 
   const fetchOrders = async () => {
     try {
-      const res = await fetch("/api/pharmacy-orders")
-      const data = await res.json()
-      setOrders(data)
+      setOrders(await pharmacyOrders.list({ limit: 200 }))
     } catch (error) {
       console.error("Error fetching orders:", error)
+      alert(errorMessage(error, "Failed to load orders"))
     } finally {
       setLoading(false)
     }
@@ -24,11 +24,7 @@ export default function AdminOrders() {
 
   const updateStatus = async (orderId: string, newStatus: string) => {
     try {
-      await fetch(`/api/pharmacy-orders/${orderId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
+      await pharmacyOrders.update(orderId, { status: newStatus as PharmacyOrder["status"] })
       fetchOrders()
     } catch (error) {
       console.error("Error updating order:", error)
@@ -56,7 +52,7 @@ export default function AdminOrders() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {orders.map((order: any) => (
+            {orders.map((order) => (
               <tr key={order.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{order.id.substring(0, 8)}...</td>
                 <td className="px-6 py-4 whitespace-nowrap">{order.patient?.name}</td>

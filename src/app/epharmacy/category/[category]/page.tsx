@@ -3,16 +3,16 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShoppingCart } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Medicine } from '@/types/medicine';
-import { medicines } from '@/services/api';
+import { Medicine, stockLabel } from '@/types/medicine';
+import { medicines, errorMessage } from '@/services/api';
 
 export default function CategoryPage() {
   const params = useParams();
   const category = params.category as string;
-  const { addToCart } = useCart();
+  const { addToCart, items } = useCart();
   const { showToast } = useToast();
   const [categoryMedicines, setCategoryMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
@@ -26,28 +26,26 @@ export default function CategoryPage() {
 
       try {
         setLoading(true);
-        // For the category page, we need to convert the URL parameter to the actual category name
-        // This is a bit tricky since the URL uses camelCase but the API uses proper case
-        // We'll try to fetch by category directly
-        const response = await medicines.getByCategory(categoryName);
+        // The URL segment is a normalised category ("painRelief"), while the
+        // database stores the display name ("Pain Relief"), so fall back to
+        // matching every category with punctuation and spacing removed.
+        const byName = await medicines.getByCategory(categoryName);
 
-        if (response.data.length === 0) {
-          // If no results, try to get all medicines and filter by category
-          const allMedicinesResponse = await medicines.getAll();
-          const filteredMedicines = allMedicinesResponse.data.filter(med => {
-            const normalizedCategory = med.category.toLowerCase().replace(/\s+/g, '');
-            const normalizedParam = category.toLowerCase();
-            return normalizedCategory === normalizedParam;
-          });
-          setCategoryMedicines(filteredMedicines);
+        if (byName.length > 0) {
+          setCategoryMedicines(byName);
         } else {
-          setCategoryMedicines(response.data);
+          const all = await medicines.list({ limit: 200 });
+          setCategoryMedicines(
+            all.filter(
+              (med) =>
+                med.category.toLowerCase().replace(/\s+/g, '') === category.toLowerCase()
+            )
+          );
         }
-
-        setLoading(false);
       } catch (error) {
         console.error('Error fetching medicines for category:', error);
-        setError('Failed to load medicines. Please try again later.');
+        setError(errorMessage(error, 'Failed to load medicines. Please try again later.'));
+      } finally {
         setLoading(false);
       }
     };
@@ -71,7 +69,17 @@ export default function CategoryPage() {
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to ePharmacy
           </Link>
-          <h1 className="text-3xl font-bold text-gray-800 mt-4">{categoryName} Medicines</h1>
+          <div className="flex flex-wrap items-center justify-between gap-4 mt-4">
+            <h1 className="text-3xl font-bold text-gray-800">{categoryName} Medicines</h1>
+            {/* Without this the cart was unreachable from a category page. */}
+            <Link
+              href="/epharmacy"
+              className="inline-flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              <ShoppingCart className="w-4 h-4" />
+              View Cart ({items.length})
+            </Link>
+          </div>
         </div>
 
         {/* Loading State */}
@@ -108,7 +116,7 @@ export default function CategoryPage() {
           {categoryMedicines.map((medicine) => (
             <div key={medicine.id} className="bg-white rounded-lg shadow-md overflow-hidden">
               <img
-                src={medicine.image}
+                src={medicine.image ?? '/logo.jpg'}
                 alt={medicine.name}
                 className="w-full h-32 sm:h-36 object-contain rounded-t-lg"
               />
@@ -124,7 +132,9 @@ export default function CategoryPage() {
                     Add to Cart
                   </button>
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Stock: {medicine.stock} units</p>
+                <p className={`text-xs mt-2 ${medicine.stock === 'OUT_OF_STOCK' ? 'text-red-600' : 'text-gray-500'}`}>
+                  {stockLabel(medicine.stock)}
+                </p>
               </div>
             </div>
           ))}

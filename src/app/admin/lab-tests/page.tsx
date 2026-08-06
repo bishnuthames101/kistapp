@@ -1,24 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+
 import { format } from 'date-fns';
 import { FlaskRound, Calendar, Clock, User, CheckCircle, XCircle, Search } from 'lucide-react';
+import { laboratoryTests as labTestsApi, errorMessage, type LaboratoryTest } from '@/services/api';
 
-interface LaboratoryTest {
-  id: string;
-  test_name: string;
-  test_description: string;
-  test_date: string;
-  test_time: string;
-  status: string;
-  notes?: string;
-  patient_id?: string;
-  patient_name?: string;
-  patient_phone?: string;
-  patient_email?: string;
-  created_at?: string;
-}
+
 
 export default function AdminLabTestsPage() {
   const [tests, setTests] = useState<LaboratoryTest[]>([]);
@@ -35,12 +23,11 @@ export default function AdminLabTestsPage() {
   const fetchTests = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/api/laboratory-tests');
-      setTests(response.data);
-      setLoading(false);
+      setTests(await labTestsApi.list({ limit: 200 }));
     } catch (err) {
       console.error('Error fetching lab tests:', err);
-      setError('Failed to load lab tests');
+      setError(errorMessage(err, 'Failed to load lab tests'));
+    } finally {
       setLoading(false);
     }
   };
@@ -48,18 +35,17 @@ export default function AdminLabTestsPage() {
   const updateTestStatus = async (testId: string, newStatus: string) => {
     try {
       setUpdatingTestId(testId);
-      await axios.patch(`/api/laboratory-tests/${testId}`, {
-        status: newStatus,
+      const updated = await labTestsApi.update(testId, {
+        status: newStatus as LaboratoryTest['status'],
       });
 
-      // Update local state
-      setTests(tests.map(test =>
-        test.id === testId ? { ...test, status: newStatus } : test
-      ));
-      setUpdatingTestId(null);
+      setTests((current) =>
+        current.map((test) => (test.id === testId ? { ...test, ...updated } : test))
+      );
     } catch (err) {
       console.error('Error updating test status:', err);
-      alert('Failed to update test status');
+      alert(errorMessage(err, 'Failed to update test status'));
+    } finally {
       setUpdatingTestId(null);
     }
   };
@@ -81,9 +67,9 @@ export default function AdminLabTestsPage() {
 
   const filteredTests = tests.filter(test => {
     const matchesSearch =
-      test.test_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      test.patient_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      test.test_description?.toLowerCase().includes(searchQuery.toLowerCase());
+      test.testName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      test.patient?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      test.testDescription?.toLowerCase().includes(searchQuery.toLowerCase());
 
     const matchesStatus = statusFilter === 'all' || test.status?.toLowerCase() === statusFilter.toLowerCase();
 
@@ -232,25 +218,25 @@ export default function AdminLabTestsPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{test.test_name}</p>
-                        <p className="text-sm text-gray-500">{test.test_description}</p>
+                        <p className="text-sm font-medium text-gray-900">{test.testName}</p>
+                        <p className="text-sm text-gray-500">{test.testDescription}</p>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <User className="w-4 h-4 text-gray-400 mr-2" />
-                        <span className="text-sm text-gray-900">{test.patient_name || 'N/A'}</span>
+                        <span className="text-sm text-gray-900">{test.patient?.name || 'N/A'}</span>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="space-y-1">
                         <div className="flex items-center text-sm text-gray-900">
                           <Calendar className="w-4 h-4 text-gray-400 mr-2" />
-                          {format(new Date(test.test_date), 'MMM d, yyyy')}
+                          {format(new Date(test.testDate), 'MMM d, yyyy')}
                         </div>
                         <div className="flex items-center text-sm text-gray-500">
                           <Clock className="w-4 h-4 text-gray-400 mr-2" />
-                          {test.test_time}
+                          {test.testTime}
                         </div>
                       </div>
                     </td>

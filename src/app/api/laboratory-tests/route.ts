@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
+import { paginated, toDateOnly } from "@/lib/serialize"
 import { z } from "zod"
 
 // GET /api/laboratory-tests - Get lab tests (all for admin, user's for patients)
@@ -42,28 +43,17 @@ export async function GET(req: NextRequest) {
       prisma.laboratoryTest.count({ where: whereClause }),
     ])
 
-    // Transform data to match frontend expectations
-    const transformedTests = tests.map(test => ({
-      id: test.id,
-      test_name: test.testName,
-      test_description: test.testDescription,
-      test_date: test.testDate.toISOString().split('T')[0],
-      test_time: test.testTime,
-      status: test.status,
-      notes: test.notes,
-      patient_id: test.patientId,
-      patient_name: test.patient?.name || 'N/A',
-      patient_phone: test.patient?.phone,
-      patient_email: test.patient?.email,
-      created_at: test.createdAt.toISOString(),
-    }))
-
-    return NextResponse.json({
-      data: transformedTests,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    })
+    // camelCase, matching Prisma and every other endpoint. This used to be
+    // hand-converted to snake_case, which is why the admin page and the
+    // patient dashboard disagreed about the field names.
+    return NextResponse.json(
+      paginated(
+        tests.map((test) => ({ ...test, testDate: toDateOnly(test.testDate) })),
+        total,
+        page,
+        limit
+      )
+    )
   } catch (error) {
     console.error("Error fetching laboratory tests:", error)
     return NextResponse.json(

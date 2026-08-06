@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
+import { paginated, toDateOnly } from "@/lib/serialize"
 import { z } from "zod"
 
 // GET /api/appointments - Get appointments (all for admin, user's for patients)
@@ -42,12 +43,17 @@ export async function GET(req: NextRequest) {
       prisma.appointment.count({ where: whereClause }),
     ])
 
-    return NextResponse.json({
-      data: appointments,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    })
+    return NextResponse.json(
+      paginated(
+        appointments.map((appointment) => ({
+          ...appointment,
+          appointmentDate: toDateOnly(appointment.appointmentDate),
+        })),
+        total,
+        page,
+        limit
+      )
+    )
   } catch (error) {
     console.error("Error fetching appointments:", error)
     return NextResponse.json(

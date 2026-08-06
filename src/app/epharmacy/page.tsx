@@ -7,38 +7,109 @@ import { ShoppingCart, Search, Plus, Minus } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { Medicine } from '@/types/medicine';
-import { pharmacyOrders, medicines } from '@/services/api';
+import { Medicine, stockLabel } from '@/types/medicine';
+import { pharmacyOrders, medicines, errorMessage } from '@/services/api';
+
+function MedicineCard({
+  medicine,
+  onAdd,
+}: {
+  medicine: Medicine;
+  onAdd: (medicine: Medicine) => void;
+}) {
+  const outOfStock = medicine.stock === 'OUT_OF_STOCK';
+
+  return (
+    <div className="glass-card p-3 hover:bg-white/30 transition-all duration-300">
+      <img
+        src={medicine.image ?? '/logo.jpg'}
+        alt={medicine.name}
+        loading="lazy"
+        className="w-full h-32 sm:h-36 object-contain rounded-lg mb-2"
+      />
+      <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1">{medicine.name}</h3>
+      <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">{medicine.description}</p>
+      <div className="flex justify-between items-center">
+        <span className="text-sm sm:text-base text-blue-600 font-semibold">
+          Rs. {medicine.price}
+        </span>
+        <button
+          onClick={() => onAdd(medicine)}
+          disabled={outOfStock}
+          className="glass-button ml-auto px-3 py-1.5 text-xs sm:text-sm"
+        >
+          {outOfStock ? 'Out of Stock' : 'Add to Cart'}
+        </button>
+      </div>
+      <p className={`text-xs mt-2 ${outOfStock ? 'text-red-600' : 'text-gray-500'}`}>
+        {stockLabel(medicine.stock)}
+      </p>
+    </div>
+  );
+}
 
 export default function EPharmacyPage() {
-  const { items, addToCart, updateQuantity, total, clearCart } = useCart();
+  const { items, addToCart, updateQuantity, total, clearCart, removeFromCart } = useCart();
   const { user } = useAuth();
   const { showToast } = useToast();
   const router = useRouter();
   const [showCart, setShowCart] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [medicineData, setMedicineData] = useState<Record<string, Medicine[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [placingOrder, setPlacingOrder] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<Medicine[] | null>(null);
+  const [searching, setSearching] = useState(false);
 
   useEffect(() => {
     const fetchMedicines = async () => {
       try {
         setLoading(true);
-        // Single optimized API call to get featured medicines (3 per category)
-        const response = await medicines.getFeatured(3);
-        setMedicineData(response.data);
-        console.log('Featured medicines loaded:', response.data);
-        setLoading(false);
+        // Single API call: a few medicines per category.
+        setMedicineData(await medicines.getFeatured(3));
       } catch (error) {
         console.error('Error fetching medicines:', error);
-        setError('Failed to load medicines. Please try again later.');
+        setError(errorMessage(error, 'Failed to load medicines. Please try again later.'));
+      } finally {
         setLoading(false);
       }
     };
 
     fetchMedicines();
   }, []);
+
+  // The search box used to be bound to state that nothing ever read. Debounced
+  // so typing does not fire a request per keystroke.
+  useEffect(() => {
+    const term = searchQuery.trim();
+
+    if (term.length < 2) {
+      setSearchResults(null);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    let cancelled = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await medicines.search(term);
+        if (!cancelled) setSearchResults(results);
+      } catch (err) {
+        console.error('Search failed:', err);
+        if (!cancelled) setSearchResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery]);
 
   const handleAddToCart = (medicine: Medicine) => {
     addToCart(medicine);
@@ -52,27 +123,57 @@ export default function EPharmacyPage() {
       return;
     }
 
-    try {
-      for (const item of items) {
-        await pharmacyOrders.create({
-          patient_id: user.id,
-          medicine_name: item.name,
-          quantity: item.quantity,
-          price_per_unit: item.price,
-          medicine_image: item.image,
-          total_amount: item.quantity * item.price,
-          delivery_address: user.address || '', // Always send, even if blank
-          payment_method: '', // Default to blank if not set in UI
-        });
-      }
+    if (placingOrder) return;
+    setPlacingOrder(true);
 
+    // Each cart line is still its own PharmacyOrder row - there is no order
+    // header in the schema yet - so a partial failure is possible. Report it
+    // honestly and leave the failed items in the cart instead of pretending
+    // the whole order went through.
+    const results = await Promise.allSettled(
+      items.map((item) =>
+        pharmacyOrders
+          .create({
+            medicineId: item.id,
+            quantity: item.quantity,
+            deliveryAddress: user.address || undefined,
+            paymentMethod: 'Cash on Delivery',
+          })
+          .then(() => item)
+      )
+    );
+
+    const failed = items.filter((_, index) => results[index].status === 'rejected');
+    const firstError = results.find((r) => r.status === 'rejected') as
+      | PromiseRejectedResult
+      | undefined;
+
+    setPlacingOrder(false);
+
+    if (failed.length === 0) {
       showToast('Order placed successfully!', 'success');
       clearCart();
       setShowCart(false);
-    } catch (error: any) {
-      console.error('Error placing order:', error);
-      showToast('Failed to place order. Please try again.', 'error');
+      return;
     }
+
+    if (failed.length === items.length) {
+      console.error('Error placing order:', firstError?.reason);
+      showToast(
+        errorMessage(firstError?.reason, 'Failed to place order. Please try again.'),
+        'error'
+      );
+      return;
+    }
+
+    // Keep only what did not go through, so a retry does not double-order.
+    items.filter((item) => !failed.includes(item)).forEach((item) => removeFromCart(item.id));
+    showToast(
+      `Ordered ${items.length - failed.length} of ${items.length} items. ${failed
+        .map((item) => item.name)
+        .join(', ')} could not be ordered.`,
+      'error'
+    );
   };
 
 
@@ -130,8 +231,34 @@ export default function EPharmacyPage() {
           </div>
         )}
 
+        {/* Search results replace the category browse while a query is active */}
+        {searchResults !== null && (
+          <div className="glass-card p-6 mb-8">
+            <h2 className="text-xl font-semibold text-gray-800 mb-6">
+              {searching
+                ? 'Searching…'
+                : `${searchResults.length} result${searchResults.length === 1 ? '' : 's'} for “${searchQuery.trim()}”`}
+            </h2>
+            {!searching && searchResults.length === 0 ? (
+              <p className="text-gray-500">
+                No medicines matched that search. Try a different name.
+              </p>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {searchResults.map((medicine) => (
+                  <MedicineCard
+                    key={medicine.id}
+                    medicine={medicine}
+                    onAdd={handleAddToCart}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Categories */}
-        {!loading && !error && (
+        {!loading && !error && searchResults === null && (
           <div className="space-y-8">
             {Object.entries(medicineData).map(([category, categoryMedicines]) => (
               <div key={category} className="glass-card p-6">
@@ -149,26 +276,11 @@ export default function EPharmacyPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {categoryMedicines.length > 0 ? (
                     categoryMedicines.slice(0, 3).map((medicine) => (
-                      <div key={medicine.id} className="glass-card p-3 hover:bg-white/30 transition-all duration-300">
-                        <img
-                          src={medicine.image}
-                          alt={medicine.name}
-                          loading="lazy"
-                          className="w-full h-32 sm:h-36 object-contain rounded-lg mb-2"
-                        />
-                        <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-1">{medicine.name}</h3>
-                        <p className="text-xs sm:text-sm text-gray-600 mb-2 line-clamp-2">{medicine.description}</p>
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm sm:text-base text-blue-600 font-semibold">Rs. {medicine.price}</span>
-                          <button
-                            onClick={() => handleAddToCart(medicine)}
-                            className="glass-button ml-auto px-3 py-1.5 text-xs sm:text-sm"
-                          >
-                            Add to Cart
-                          </button>
-                        </div>
-                        <p className="text-xs text-gray-500 mt-2">Stock: {medicine.stock}</p>
-                      </div>
+                      <MedicineCard
+                        key={medicine.id}
+                        medicine={medicine}
+                        onAdd={handleAddToCart}
+                      />
                     ))
                   ) : (
                     <div className="col-span-3 text-center py-8">
@@ -206,7 +318,7 @@ export default function EPharmacyPage() {
                           <div key={item.id} className="glass p-4 rounded-lg">
                             <div className="flex items-center">
                               <img
-                                src={item.image}
+                                src={item.image ?? '/logo.jpg'}
                                 alt={item.name}
                                 loading="lazy"
                                 className="w-16 h-16 object-cover rounded"
@@ -241,9 +353,14 @@ export default function EPharmacyPage() {
                         </div>
                         <button
                           onClick={handleOrder}
+                          disabled={placingOrder}
                           className="glass-button w-full"
                         >
-                          {user ? 'Place Order' : 'Login to Order'}
+                          {placingOrder
+                            ? 'Placing order…'
+                            : user
+                              ? 'Place Order'
+                              : 'Login to Order'}
                         </button>
                       </div>
                     </>

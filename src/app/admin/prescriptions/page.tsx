@@ -1,9 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { prescriptions as prescriptionsApi, errorMessage, type Prescription } from "@/services/api"
 
 export default function AdminPrescriptions() {
-  const [prescriptions, setPrescriptions] = useState([])
+  const [prescriptions, setPrescriptions] = useState<Prescription[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -12,11 +13,10 @@ export default function AdminPrescriptions() {
 
   const fetchPrescriptions = async () => {
     try {
-      const res = await fetch("/api/prescriptions")
-      const data = await res.json()
-      setPrescriptions(data)
+      setPrescriptions(await prescriptionsApi.list({ limit: 200 }))
     } catch (error) {
       console.error("Error fetching prescriptions:", error)
+      alert(errorMessage(error, "Failed to load prescriptions"))
     } finally {
       setLoading(false)
     }
@@ -24,11 +24,7 @@ export default function AdminPrescriptions() {
 
   const updateStatus = async (prescriptionId: string, newStatus: string) => {
     try {
-      await fetch(`/api/prescriptions/${prescriptionId}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
+      await prescriptionsApi.update(prescriptionId, { status: newStatus as Prescription["status"] })
       fetchPrescriptions()
     } catch (error) {
       console.error("Error updating prescription:", error)
@@ -55,7 +51,7 @@ export default function AdminPrescriptions() {
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {prescriptions.map((prescription: any) => (
+            {prescriptions.map((prescription) => (
               <tr key={prescription.id}>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">{prescription.id.substring(0, 8)}...</td>
                 <td className="px-6 py-4 whitespace-nowrap">

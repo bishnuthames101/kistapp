@@ -38,9 +38,9 @@ export default function AdminMedicines() {
 
   const fetchMedicines = async () => {
     try {
-      const res = await fetch("/api/medicines")
-      const data = await res.json()
-      setMedicines(data)
+      const res = await fetch("/api/medicines?limit=200")
+      const body = await res.json()
+      setMedicines(Array.isArray(body) ? body : body.data ?? [])
     } catch (error) {
       console.error("Error fetching medicines:", error)
     } finally {

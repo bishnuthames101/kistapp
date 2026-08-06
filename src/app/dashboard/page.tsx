@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
-import { appointments, laboratoryTests } from '@/services/api';
+import { appointments, laboratoryTests, errorMessage } from '@/services/api';
 import { useToast } from '@/contexts/ToastContext';
 import { format } from 'date-fns';
 import {
@@ -94,19 +94,21 @@ function AppointmentsSection() {
 
   const fetchAppointments = async () => {
     try {
-      const response = await appointments.getAll();
-      const allAppointments = response.data;
-      const now = new Date();
+      const allAppointments = await appointments.list({ limit: 100 });
+      // Compare against the start of today so an appointment later today still
+      // counts as upcoming rather than jumping straight to "past".
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-      // Split appointments into upcoming and past
-      const upcoming = allAppointments.filter(apt => new Date(apt.appointmentDate) >= now);
-      const past = allAppointments.filter(apt => new Date(apt.appointmentDate) < now);
-
-      setUpcomingAppointments(upcoming);
-      setPastAppointments(past);
-    } catch (error: any) {
+      setUpcomingAppointments(
+        allAppointments.filter((apt) => new Date(apt.appointmentDate) >= startOfToday)
+      );
+      setPastAppointments(
+        allAppointments.filter((apt) => new Date(apt.appointmentDate) < startOfToday)
+      );
+    } catch (error) {
       console.error('Error fetching appointments:', error);
-      setError('Failed to load appointments. Please try again later.');
+      setError(errorMessage(error, 'Failed to load appointments. Please try again later.'));
     } finally {
       setLoading(false);
     }
@@ -216,19 +218,15 @@ function LabTestsSection() {
 
   const fetchTests = async () => {
     try {
-      const response = await laboratoryTests.getAll();
-      const allTests = response.data;
-      const now = new Date();
+      const allTests = await laboratoryTests.list({ limit: 100 });
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
 
-      // Split tests into upcoming and past
-      const upcoming = allTests.filter((test: LaboratoryTest) => new Date(test.testDate) >= now);
-      const past = allTests.filter((test: LaboratoryTest) => new Date(test.testDate) < now);
-
-      setUpcomingTests(upcoming);
-      setPastTests(past);
-    } catch (error: any) {
+      setUpcomingTests(allTests.filter((test) => new Date(test.testDate) >= startOfToday));
+      setPastTests(allTests.filter((test) => new Date(test.testDate) < startOfToday));
+    } catch (error) {
       console.error('Error fetching tests:', error);
-      setError('Failed to load tests. Please try again later.');
+      setError(errorMessage(error, 'Failed to load tests. Please try again later.'));
     } finally {
       setLoading(false);
     }

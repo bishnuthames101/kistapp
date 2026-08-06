@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
+import { paginated, readPageParams } from "@/lib/serialize"
 import { z } from "zod"
 
 // GET /api/prescriptions
@@ -11,21 +12,29 @@ export async function GET(req: NextRequest) {
 
     const where = user!.role === "admin" ? {} : { patientId: user!.id }
 
-    const prescriptions = await prisma.prescription.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        patient: {
-          select: {
-            name: true,
-            phone: true,
-            email: true,
-          }
-        }
-      }
-    })
+    const { page, limit, skip } = readPageParams(req.url)
 
-    return NextResponse.json(prescriptions)
+    const [prescriptions, total] = await prisma.$transaction([
+      prisma.prescription.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          patient: {
+            select: {
+              id: true,
+              name: true,
+              phone: true,
+              email: true,
+            }
+          }
+        },
+        skip,
+        take: limit,
+      }),
+      prisma.prescription.count({ where }),
+    ])
+
+    return NextResponse.json(paginated(prescriptions, total, page, limit))
   } catch (error) {
     console.error("Error fetching prescriptions:", error)
     return NextResponse.json(

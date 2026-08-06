@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAdmin } from "@/lib/auth"
+import { paginated, serializeMedicine } from "@/lib/serialize"
 import { z } from "zod"
 
 // GET /api/medicines - List all medicines with optional filters
@@ -59,12 +60,9 @@ export async function GET(req: NextRequest) {
       prisma.medicine.count({ where }),
     ])
 
-    return NextResponse.json({
-      data: medicines,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    })
+    return NextResponse.json(
+      paginated(medicines.map(serializeMedicine), total, page, limit)
+    )
   } catch (error) {
     console.error("Error fetching medicines:", error)
     return NextResponse.json(
@@ -97,7 +95,7 @@ export async function POST(req: NextRequest) {
       data: validated,
     })
 
-    return NextResponse.json(medicine, { status: 201 })
+    return NextResponse.json(serializeMedicine(medicine), { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

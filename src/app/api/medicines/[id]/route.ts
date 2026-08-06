@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { serializeMedicine } from "@/lib/serialize"
 import { requireAdmin } from "@/lib/auth"
 import { z } from "zod"
 
@@ -21,7 +22,7 @@ export async function GET(
       )
     }
 
-    return NextResponse.json(medicine)
+    return NextResponse.json(serializeMedicine(medicine))
   } catch (error) {
     console.error("Error fetching medicine:", error)
     return NextResponse.json(
@@ -59,7 +60,7 @@ export async function PATCH(
       data: validated,
     })
 
-    return NextResponse.json(medicine)
+    return NextResponse.json(serializeMedicine(medicine))
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

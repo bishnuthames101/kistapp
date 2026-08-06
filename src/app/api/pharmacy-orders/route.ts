@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
+import { paginated, serializeOrder } from "@/lib/serialize"
 import { z } from "zod"
 
 // GET /api/pharmacy-orders - Get user's orders
@@ -36,12 +37,9 @@ export async function GET(req: NextRequest) {
       prisma.pharmacyOrder.count({ where }),
     ])
 
-    return NextResponse.json({
-      data: orders,
-      total,
-      page,
-      totalPages: Math.ceil(total / limit),
-    })
+    return NextResponse.json(
+      paginated(orders.map(serializeOrder), total, page, limit)
+    )
   } catch (error) {
     console.error("Error fetching pharmacy orders:", error)
     return NextResponse.json(
@@ -138,7 +136,7 @@ export async function POST(req: NextRequest) {
       }
     })
 
-    return NextResponse.json(order, { status: 201 })
+    return NextResponse.json(serializeOrder(order), { status: 201 })
   } catch (error) {
     if (error instanceof z.ZodError) {
       return NextResponse.json(

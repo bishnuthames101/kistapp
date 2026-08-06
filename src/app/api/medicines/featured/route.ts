@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { serializeMedicine } from "@/lib/serialize"
 
 // GET /api/medicines/featured - Get featured medicines per category
 export async function GET(req: NextRequest) {
@@ -28,7 +29,7 @@ export async function GET(req: NextRequest) {
 
       // Create category key (lowercase, no spaces)
       const categoryKey = category.toLowerCase().replace(/\s+/g, "")
-      result[categoryKey] = medicines
+      result[categoryKey] = medicines.map(serializeMedicine)
     }
 
     return NextResponse.json(result)

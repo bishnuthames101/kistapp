@@ -1,25 +1,38 @@
-import axios from 'axios';
+/**
+ * Typed wrappers over the /api routes.
+ *
+ * The types below describe what the server actually sends: camelCase fields
+ * matching the Prisma models, money already converted to numbers, and
+ * date-only columns as "YYYY-MM-DD". They are not aspirational - if one of
+ * them drifts from a route, `getList` throws an ApiShapeError rather than
+ * failing silently.
+ *
+ * This module previously spoke to a Django backend over axios with a bearer
+ * token from localStorage. Auth is cookie-based now, so none of that remains.
+ */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+import { del, get, getList, getPage, patch, post } from "@/lib/api-client";
 
-interface LoginResponse {
-  access: string;
-  refresh: string;
-  user: User;
-}
+export { ApiError, ApiShapeError, errorMessage } from "@/lib/api-client";
+export type { Paginated } from "@/lib/api-client";
 
-export interface Appointment {
-  id: number;
-  doctorName: string;
-  doctorSpecialization: string;
-  appointmentDate: string;
-  appointmentTime: string;
-  status: string;
-  reason?: string;
-  notes?: string;
-  patientId?: string;
-  createdAt?: string;
-  updatedAt?: string;
+/* -------------------------------------------------------------------------- */
+/*                                   Types                                    */
+/* -------------------------------------------------------------------------- */
+
+export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancelled";
+export type LaboratoryTestStatus = AppointmentStatus;
+export type PharmacyOrderStatus = "pending" | "processing" | "delivered" | "cancelled";
+export type PaymentStatus = "pending" | "completed" | "failed";
+export type PrescriptionStatus = "pending" | "verified" | "rejected";
+export type StockStatus = "IN_STOCK" | "OUT_OF_STOCK";
+
+/** Patient summary embedded in admin-facing records. */
+export interface PatientSummary {
+  id: string;
+  name: string;
+  phone: string;
+  email: string;
 }
 
 export interface User {
@@ -28,7 +41,38 @@ export interface User {
   name: string;
   email: string;
   address: string;
-  role: 'patient' | 'admin';
+  role: "patient" | "admin";
+}
+
+export interface Appointment {
+  id: string;
+  patientId: string;
+  doctorName: string;
+  doctorSpecialization: string;
+  /** "YYYY-MM-DD" */
+  appointmentDate: string;
+  appointmentTime: string;
+  status: AppointmentStatus;
+  reason?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  patient?: PatientSummary;
+}
+
+export interface LaboratoryTest {
+  id: string;
+  patientId: string;
+  testName: string;
+  testDescription: string;
+  /** "YYYY-MM-DD" */
+  testDate: string;
+  testTime: string;
+  status: LaboratoryTestStatus;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  patient?: PatientSummary;
 }
 
 export interface Medicine {
@@ -36,156 +80,59 @@ export interface Medicine {
   name: string;
   description: string;
   price: number;
-  image: string;
+  image: string | null;
   category: string;
-  stock: 'In Stock' | 'Out of Stock';
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface LaboratoryTest {
-  id: number;
-  testName: string;
-  testDescription: string;
-  testDate: string;
-  testTime: string;
-  status: string;
-  notes?: string;
-  patientId?: string;
+  stock: StockStatus;
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface PharmacyOrder {
-  id: number;
-  patient_id: string;
-  patient?: string;
-  medicine_name: string;
+  id: string;
+  patientId: string;
+  medicineId: string;
   quantity: number;
-  price_per_unit: number;
-  medicine_image?: string;
-  medicine_image_url?: string;
-  total_amount: number;
-  order_date: string;
-  status: 'pending' | 'processing' | 'delivered' | 'cancelled';
-  delivery_address?: string;
-  payment_method?: string;
-  payment_status: 'pending' | 'completed' | 'failed';
-  created_at?: string;
-  updated_at?: string;
+  pricePerUnit: number;
+  totalAmount: number;
+  deliveryAddress?: string | null;
+  paymentMethod?: string | null;
+  status: PharmacyOrderStatus;
+  paymentStatus: PaymentStatus;
+  createdAt: string;
+  updatedAt: string;
+  patient?: PatientSummary;
+  medicine?: Medicine;
 }
+
 export interface Prescription {
-  id: number;
-  patient_id: string;
-  patient_name: string;
-  patient_phone: string;
-  prescription_image: string;
-  status: 'pending' | 'verified' | 'rejected';
-  notes?: string;
-  created_at: string;
-  updated_at: string;
+  id: string;
+  patientId: string;
+  prescriptionImageUrl: string;
+  status: PrescriptionStatus;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  patient?: PatientSummary;
 }
 
+/* -------------------------------------------------------------------------- */
+/*                                 Endpoints                                  */
+/* -------------------------------------------------------------------------- */
 
-export interface MedicalRecord {
-  id: number;
-  patient: number;
-  patient_name: string;
-  title: string;
-  description: string | null;
-  file: string;
-  file_url: string;
-  file_type: string;
-  uploaded_at: string;
+function query(params: Record<string, string | number | boolean | undefined>) {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value !== undefined && value !== "") search.append(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : "";
 }
-
-const api = axios.create({
-  baseURL: API_URL,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-});
-
-// Add token to requests if it exists
-api.interceptors.request.use(
-  (config) => {
-    if (typeof window !== 'undefined') {
-      const token = localStorage.getItem('token');
-      if (token && config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
-  }
-);
-
-// Add response interceptor for handling auth errors
-api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
-  (error) => {
-    if (error.response?.status === 401 && typeof window !== 'undefined') {
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('user');
-      window.location.href = '/login';
-    }
-    return Promise.reject(error);
-  }
-);
-
-export const auth = {
-  login: async (phone: string, password: string) => {
-    const response = await api.post<LoginResponse>('/auth/login', { phone, password });
-    const { access, refresh, user } = response.data;
-
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('token', access);
-      localStorage.setItem('refresh_token', refresh);
-      localStorage.setItem('user', JSON.stringify(user));
-    }
-
-    return response;
-  },
-  register: async (data: {
-    phone: string;
-    password: string;
-    name: string;
-    email: string;
-    address: string;
-  }) => {
-    const cleanedPhone = data.phone.replace(/\D/g, '');
-
-    if (cleanedPhone.length !== 10 || !cleanedPhone.startsWith('9')) {
-      throw new Error('Phone number must be 10 digits starting with 9');
-    }
-    if (data.password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
-    }
-
-    const payload = {
-      phone: cleanedPhone,
-      name: data.name,
-      email: data.email,
-      password: data.password,
-      address: data.address,
-    };
-
-    return api.post('/auth/register', payload);
-  },
-  getProfile: () => {
-    return api.get<User>('/users/me');
-  },
-};
 
 export const appointments = {
-  getAll: () => {
-    return api.get<Appointment[]>('/appointments');
-  },
+  list: (params: { page?: number; limit?: number } = {}) =>
+    getList<Appointment>(`/appointments${query(params)}`),
+  page: (params: { page?: number; limit?: number } = {}) =>
+    getPage<Appointment>(`/appointments${query(params)}`),
   create: (data: {
     doctorName: string;
     doctorSpecialization: string;
@@ -193,136 +140,84 @@ export const appointments = {
     appointmentTime: string;
     reason?: string;
     notes?: string;
-  }) => {
-    return api.post<Appointment>('/appointments', data);
-  },
-  update: (id: number, data: Partial<Appointment>) => {
-    return api.patch<Appointment>(`/appointments/${id}`, data);
-  },
-  cancel: (id: number) => {
-    return api.patch<Appointment>(`/appointments/${id}`, { status: 'cancelled' });
-  },
+  }) => post<Appointment>("/appointments", data),
+  update: (id: string, data: Partial<Pick<Appointment, "status" | "notes" | "reason">>) =>
+    patch<Appointment>(`/appointments/${id}`, data),
+  cancel: (id: string) =>
+    patch<Appointment>(`/appointments/${id}`, { status: "cancelled" }),
 };
 
 export const laboratoryTests = {
-  getAll: () => {
-    return api.get<LaboratoryTest[]>('/laboratory-tests');
-  },
+  list: (params: { page?: number; limit?: number } = {}) =>
+    getList<LaboratoryTest>(`/laboratory-tests${query(params)}`),
+  page: (params: { page?: number; limit?: number } = {}) =>
+    getPage<LaboratoryTest>(`/laboratory-tests${query(params)}`),
   create: (data: {
     testName: string;
     testDescription: string;
     testDate: string;
     testTime: string;
     notes?: string;
-  }) => {
-    return api.post<LaboratoryTest>('/laboratory-tests', data);
-  },
-  update: (id: number, data: Partial<LaboratoryTest>) => {
-    return api.patch<LaboratoryTest>(`/laboratory-tests/${id}`, data);
-  },
-  cancel: (id: number) => {
-    return api.patch<LaboratoryTest>(`/laboratory-tests/${id}`, { status: 'cancelled' });
-  }
+  }) => post<LaboratoryTest>("/laboratory-tests", data),
+  update: (id: string, data: Partial<Pick<LaboratoryTest, "status" | "notes">>) =>
+    patch<LaboratoryTest>(`/laboratory-tests/${id}`, data),
+  cancel: (id: string) =>
+    patch<LaboratoryTest>(`/laboratory-tests/${id}`, { status: "cancelled" }),
 };
 
 export const pharmacyOrders = {
-  getAll: () => {
-    return api.get<PharmacyOrder[]>('/pharmacy-orders');
-  },
+  list: (params: { page?: number; limit?: number } = {}) =>
+    getList<PharmacyOrder>(`/pharmacy-orders${query(params)}`),
+  getById: (id: string) => get<PharmacyOrder>(`/pharmacy-orders/${id}`),
+  /**
+   * The server re-reads the price from the database, so only the medicine and
+   * quantity are sent. Passing a price here would be ignored.
+   */
   create: (data: {
-    patient_id: string;
-    medicine_name: string;
+    medicineId: string;
     quantity: number;
-    price_per_unit: number;
-    medicine_image?: string;
-    total_amount: number;
-    delivery_address?: string;
-    payment_method?: string;
-  }) => {
-    return api.post<PharmacyOrder>('/pharmacy-orders', data);
-  },
-  getById: (id: number) => {
-    return api.get<PharmacyOrder>(`/pharmacy-orders/${id}`);
-  },
-  update: (id: number, data: Partial<PharmacyOrder>) => {
-    return api.patch<PharmacyOrder>(`/pharmacy-orders/${id}`, data);
-  },
-  cancel: (id: number) => {
-    return api.patch<PharmacyOrder>(`/pharmacy-orders/${id}`, { status: 'cancelled' });
-  }
-};
-
-export const medicalRecords = {
-  getAll: () => {
-    return api.get<MedicalRecord[]>('/medical-records');
-  },
-  upload: (formData: FormData) => {
-    return api.post<MedicalRecord>('/medical-records', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  getById: (id: number) => {
-    return api.get<MedicalRecord>(`/medical-records/${id}`);
-  },
-  delete: (id: number) => {
-    return api.delete(`/medical-records/${id}`);
-  },
+    deliveryAddress?: string;
+    paymentMethod?: string;
+  }) => post<PharmacyOrder>("/pharmacy-orders", data),
+  update: (id: string, data: Partial<Pick<PharmacyOrder, "status" | "paymentStatus">>) =>
+    patch<PharmacyOrder>(`/pharmacy-orders/${id}`, data),
+  cancel: (id: string) =>
+    patch<PharmacyOrder>(`/pharmacy-orders/${id}`, { status: "cancelled" }),
 };
 
 export const medicines = {
-  getAll: () => {
-    return api.get<Medicine[]>('/medicines');
-  },
-  getById: (id: string) => {
-    return api.get<Medicine>(`/medicines/${id}`);
-  },
-  getByCategory: (category: string) => {
-    const encodedCategory = encodeURIComponent(category);
-    return api.get<Medicine[]>(`/medicines?category=${encodedCategory}`);
-  },
-  getCategories: () => {
-    return api.get<string[]>('/medicines/categories');
-  },
-  getFeatured: (limit: number = 3) => {
-    return api.get<Record<string, Medicine[]>>(`/medicines/featured?limit=${limit}`);
-  },
-  search: (query: string) => {
-    return api.get<Medicine[]>(`/medicines?search=${query}`);
-  },
-  filter: (params: {
+  list: (params: {
     category?: string;
+    search?: string;
+    in_stock?: boolean;
     min_price?: number;
     max_price?: number;
-    in_stock?: boolean;
-  }) => {
-    const queryParams = new URLSearchParams();
-    if (params.category) queryParams.append('category', params.category);
-    if (params.min_price) queryParams.append('min_price', params.min_price.toString());
-    if (params.max_price) queryParams.append('max_price', params.max_price.toString());
-    if (params.in_stock !== undefined) queryParams.append('in_stock', params.in_stock.toString());
-
-    return api.get<Medicine[]>(`/medicines?${queryParams.toString()}`);
-  },
+    page?: number;
+    limit?: number;
+  } = {}) => getList<Medicine>(`/medicines${query(params)}`),
+  getById: (id: string) => get<Medicine>(`/medicines/${id}`),
+  getByCategory: (category: string, limit = 100) =>
+    getList<Medicine>(`/medicines${query({ category, limit })}`),
+  search: (search: string, limit = 50) =>
+    getList<Medicine>(`/medicines${query({ search, limit })}`),
+  getCategories: () => getList<string>("/medicines/categories"),
+  /** Returns a few medicines per category, keyed by a normalised category name. */
+  getFeatured: (limit = 3) =>
+    get<Record<string, Medicine[]>>(`/medicines/featured${query({ limit })}`),
+  create: (data: Omit<Medicine, "id" | "createdAt" | "updatedAt">) =>
+    post<Medicine>("/medicines", data),
+  update: (id: string, data: Partial<Medicine>) =>
+    patch<Medicine>(`/medicines/${id}`, data),
+  remove: (id: string) => del<{ message?: string }>(`/medicines/${id}`),
 };
 
-
 export const prescriptions = {
-  getAll: () => {
-    return api.get<Prescription[]>('/prescriptions');
-  },
-  upload: (formData: FormData) => {
-    return api.post<Prescription>('/prescriptions', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    });
-  },
-  getById: (id: number) => {
-    return api.get<Prescription>(`/prescriptions/${id}`);
-  },
-  delete: (id: number) => {
-    return api.delete(`/prescriptions/${id}`);
-  },
+  list: (params: { page?: number; limit?: number } = {}) =>
+    getList<Prescription>(`/prescriptions${query(params)}`),
+  getById: (id: string) => get<Prescription>(`/prescriptions/${id}`),
+  create: (data: { prescriptionImageUrl: string; notes?: string }) =>
+    post<Prescription>("/prescriptions", data),
+  update: (id: string, data: Partial<Pick<Prescription, "status" | "notes">>) =>
+    patch<Prescription>(`/prescriptions/${id}`, data),
+  remove: (id: string) => del<{ message?: string }>(`/prescriptions/${id}`),
 };

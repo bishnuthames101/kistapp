@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useAuth } from '../contexts/AuthContext';
-import { pharmacyOrders, PharmacyOrder } from '../services/api';
+import { pharmacyOrders, PharmacyOrder, errorMessage } from '../services/api';
 import { format } from 'date-fns';
 import { Pill, ChevronDown, ChevronUp } from 'lucide-react';
 
@@ -12,20 +12,19 @@ export default function PharmacyOrdersSection() {
   const [orders, setOrders] = useState<PharmacyOrder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [expandedOrder, setExpandedOrder] = useState<number | null>(null);
+  const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchOrders = async () => {
+      if (!user) return;
       try {
-        if (user) {
-          setLoading(true);
-          const response = await pharmacyOrders.getAll();
-          const userOrders = response.data.filter(order => order.patient === user.id);
-          setOrders(userOrders);
-        }
+        setLoading(true);
+        // The server already scopes non-admin callers to their own orders,
+        // so there is nothing to filter client-side.
+        setOrders(await pharmacyOrders.list({ limit: 100 }));
       } catch (err) {
         console.error('Error fetching pharmacy orders:', err);
-        setError('Failed to load your pharmacy orders. Please try again later.');
+        setError(errorMessage(err, 'Failed to load your pharmacy orders. Please try again later.'));
       } finally {
         setLoading(false);
       }
@@ -34,7 +33,7 @@ export default function PharmacyOrdersSection() {
     fetchOrders();
   }, [user]);
 
-  const toggleOrderDetails = (orderId: number) => {
+  const toggleOrderDetails = (orderId: string) => {
     setExpandedOrder(expandedOrder === orderId ? null : orderId);
   };
 
@@ -117,15 +116,13 @@ export default function PharmacyOrdersSection() {
               <React.Fragment key={order.id}>
                 <tr className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    #{order.id}
+                    #{order.id.slice(0, 8)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {format(new Date(order.order_date), 'PP')}
+                    {format(new Date(order.createdAt), 'PP')}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    Rs. {typeof order.total_amount === 'string'
-                      ? parseFloat(order.total_amount).toFixed(2)
-                      : order.total_amount.toFixed(2)}
+                    Rs. {order.totalAmount.toFixed(2)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span
@@ -180,10 +177,10 @@ export default function PharmacyOrdersSection() {
                               <tr>
                                 <td className="px-4 py-2 text-sm">
                                   <div className="flex items-center">
-                                    {order.medicine_image_url ? (
+                                    {order.medicine?.image ? (
                                       <img
-                                        src={order.medicine_image_url}
-                                        alt={order.medicine_name}
+                                        src={order.medicine.image}
+                                        alt={order.medicine.name}
                                         className="w-10 h-10 object-cover rounded mr-2"
                                       />
                                     ) : (
@@ -191,17 +188,15 @@ export default function PharmacyOrdersSection() {
                                         <Pill className="w-6 h-6" />
                                       </div>
                                     )}
-                                    {order.medicine_name}
+                                    {order.medicine?.name ?? 'Medicine'}
                                   </div>
                                 </td>
                                 <td className="px-4 py-2 text-sm">{order.quantity}</td>
-                                <td className="px-4 py-2 text-sm">Rs. {typeof order.price_per_unit === 'string'
-                                  ? parseFloat(order.price_per_unit).toFixed(2)
-                                  : order.price_per_unit.toFixed(2)}</td>
                                 <td className="px-4 py-2 text-sm">
-                                  Rs. {typeof order.total_amount === 'string'
-                                    ? parseFloat(order.total_amount).toFixed(2)
-                                    : order.total_amount.toFixed(2)}
+                                  Rs. {order.pricePerUnit.toFixed(2)}
+                                </td>
+                                <td className="px-4 py-2 text-sm">
+                                  Rs. {order.totalAmount.toFixed(2)}
                                 </td>
                               </tr>
                             </tbody>
@@ -210,9 +205,17 @@ export default function PharmacyOrdersSection() {
                         <div className="flex justify-between text-sm">
                           <span>Payment Method:</span>
                           <span className="font-medium text-gray-700">
-                            Cash on Delivery
+                            {order.paymentMethod || 'Cash on Delivery'}
                           </span>
                         </div>
+                        {order.deliveryAddress && (
+                          <div className="flex justify-between text-sm">
+                            <span>Delivery Address:</span>
+                            <span className="font-medium text-gray-700">
+                              {order.deliveryAddress}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     </td>
                   </tr>
