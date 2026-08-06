@@ -7,7 +7,8 @@ import { Clock, AlertCircle, ArrowLeft, Check } from 'lucide-react';
 import { labTests } from '@/data/labTests';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { laboratoryTests } from '@/services/api';
+import { laboratoryTests, errorMessage } from '@/services/api';
+import Modal from '@/components/Modal';
 
 export default function TestDetailPage() {
   const params = useParams();
@@ -72,32 +73,11 @@ export default function TestDetailPage() {
       setShowConfirmation(false);
       setSelectedDate('');
       setSelectedTime('');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to book test:', error);
-      let errorMessage = 'Failed to book test';
-
-      if (error.response) {
-        if (error.response.data) {
-          // If we have specific error details
-          if (typeof error.response.data === 'string') {
-            errorMessage = error.response.data;
-          } else if (typeof error.response.data === 'object') {
-            // If we have field-specific errors
-            const errorDetails = Object.entries(error.response.data)
-              .map(([field, message]) => `${field}: ${message}`)
-              .join(', ');
-            errorMessage = errorDetails || errorMessage;
-          }
-        } else if (error.response.status === 401) {
-          errorMessage = 'Please login to book a test';
-        } else if (error.response.status === 403) {
-          errorMessage = 'You do not have permission to book this test';
-        } else if (error.response.status === 400) {
-          errorMessage = 'Invalid test booking data';
-        }
-      }
-
-      showToast(errorMessage, 'error');
+      // Previously inspected error.response, an axios shape that no longer
+      // exists, so every failure fell through to the generic message.
+      showToast(errorMessage(error, 'Failed to book test'), 'error');
     }
   };
 
@@ -165,10 +145,13 @@ export default function TestDetailPage() {
       </div>
 
       {/* Booking Modal */}
-      {showBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-            <h2 className="text-2xl font-bold mb-6">Book Test</h2>
+      <Modal
+        open={showBooking}
+        onClose={() => setShowBooking(false)}
+        title="Book Test"
+        labelledBy="booking-title"
+      >
+        <>
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -217,15 +200,17 @@ export default function TestDetailPage() {
                 Continue
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
 
       {/* Confirmation Modal */}
-      {showConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-            <h2 className="text-2xl font-bold mb-6">Confirm Booking</h2>
+      <Modal
+        open={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        title="Confirm Booking"
+        labelledBy="confirm-title"
+      >
+        <>
 
             <div className="space-y-4 mb-6">
               <div>
@@ -263,9 +248,8 @@ export default function TestDetailPage() {
                 Confirm Booking
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
     </div>
   );
 }

@@ -7,7 +7,8 @@ import { services } from '@/data/services';
 import { Calendar, Check, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { appointments } from '@/services/api';
+import { appointments, errorMessage } from '@/services/api';
+import Modal from '@/components/Modal';
 
 // Generate time slots from 10 AM to 4 PM
 const generateTimeSlots = () => {
@@ -82,24 +83,17 @@ export default function ServiceDetailPage() {
         appointmentTime: selectedTime,
         reason: `Appointment for ${service.name} service`,
       };
-      console.log('Creating appointment with data:', appointmentData);
-
-      // Create the appointment using the API
       await appointments.create(appointmentData);
 
-      showToast('Appointment booked successfully!', 'success');
+      showToast('Appointment booked successfully! You can see it in your dashboard.', 'success');
       setShowBooking(false);
       setShowConfirmation(false);
       setSelectedDoctor('');
       setSelectedDate('');
       setSelectedTime('');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to book appointment:', error);
-      console.error('Error response data:', error.response?.data);
-      const errorMessage = error.response?.data?.patient?.[0] ||
-        error.response?.data?.detail ||
-        'Failed to book appointment';
-      showToast(errorMessage, 'error');
+      showToast(errorMessage(error, 'Failed to book appointment'), 'error');
     }
   };
 
@@ -199,11 +193,13 @@ export default function ServiceDetailPage() {
       </div>
 
       {/* Booking Modal */}
-      {showBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-            <h2 className="text-2xl font-bold mb-6">Book Appointment</h2>
-
+      <Modal
+        open={showBooking}
+        onClose={() => setShowBooking(false)}
+        title="Book Appointment"
+        labelledBy="booking-title"
+      >
+        <>
             {/* Doctor Selection */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -271,16 +267,17 @@ export default function ServiceDetailPage() {
                 Continue
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
 
       {/* Confirmation Modal */}
-      {showConfirmation && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-            <h2 className="text-2xl font-bold mb-6">Confirm Appointment</h2>
-
+      <Modal
+        open={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        title="Confirm Appointment"
+        labelledBy="confirm-title"
+      >
+        <>
             <div className="space-y-4 mb-6">
               <div>
                 <p className="text-sm text-gray-600">Service</p>
@@ -323,9 +320,8 @@ export default function ServiceDetailPage() {
                 Confirm Booking
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
     </div>
   );
 }

@@ -7,6 +7,8 @@ import { Calendar, Check, ArrowLeft } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
 import { doctors } from '@/data/doctors';
+import { appointments, errorMessage } from '@/services/api';
+import Modal from '@/components/Modal';
 
 
 
@@ -20,6 +22,7 @@ export default function DoctorProfile() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  const [booking, setBooking] = useState(false);
 
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -51,12 +54,33 @@ export default function DoctorProfile() {
     setShowConfirmation(true);
   };
 
-  const handleFinalConfirmation = () => {
-    showToast('Appointment booked successfully!', 'success');
-    setShowBooking(false);
-    setShowConfirmation(false);
-    setSelectedDate('');
-    setSelectedTime('');
+  const handleFinalConfirmation = async () => {
+    if (!doctor) return;
+    if (booking) return;
+
+    // This used to show a success toast and never call the API at all, so
+    // booking from a doctor profile created nothing.
+    setBooking(true);
+    try {
+      await appointments.create({
+        doctorName: doctor.name,
+        doctorSpecialization: doctor.specialty,
+        appointmentDate: selectedDate,
+        appointmentTime: selectedTime,
+        reason: `Consultation with ${doctor.name}`,
+      });
+
+      showToast('Appointment booked successfully! You can see it in your dashboard.', 'success');
+      setShowBooking(false);
+      setShowConfirmation(false);
+      setSelectedDate('');
+      setSelectedTime('');
+    } catch (error) {
+      console.error('Failed to book appointment:', error);
+      showToast(errorMessage(error, 'Failed to book appointment'), 'error');
+    } finally {
+      setBooking(false);
+    }
   };
 
   if (!doctor) {
@@ -113,10 +137,13 @@ export default function DoctorProfile() {
       </div>
 
       {/* Booking Modal */}
-      {showBooking && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-            <h2 className="text-2xl font-bold mb-6">Book Appointment</h2>
+      <Modal
+        open={showBooking}
+        onClose={() => setShowBooking(false)}
+        title="Book Appointment"
+        labelledBy="booking-title"
+      >
+        <>
 
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -164,15 +191,17 @@ export default function DoctorProfile() {
                 Continue
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
 
       {/* Confirmation Modal */}
-{showConfirmation && (
-  <div className="fixed inset-0 z-50 flex items-center justify-center pointer-events-none">
-    <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4 shadow-2xl pointer-events-auto">
-      <h2 className="text-2xl font-bold mb-6">Confirm Appointment</h2>
+<Modal
+  open={showConfirmation}
+  onClose={() => setShowConfirmation(false)}
+  title="Confirm Appointment"
+  labelledBy="confirm-title"
+>
+  <>
 
       <div className="space-y-4 mb-6">
         <div>
@@ -194,8 +223,8 @@ export default function DoctorProfile() {
           <p className="font-medium">Rs. {doctor.opdCharge}</p>
         </div>
         <div className="pt-4 border-t">
-          <p className="font-medium text-gray-800">Payment Method</p>
-          <p className="text-gray-600">Cash on Delivery</p>
+          <p className="font-medium text-gray-800">Payment</p>
+          <p className="text-gray-600">Pay at the clinic on the day of your visit</p>
         </div>
       </div>
 
@@ -208,15 +237,15 @@ export default function DoctorProfile() {
         </button>
         <button
           onClick={handleFinalConfirmation}
-          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center"
+          disabled={booking}
+          className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-60"
         >
           <Check className="w-4 h-4 mr-2" />
-          Confirm Booking
+          {booking ? 'Booking…' : 'Confirm Booking'}
         </button>
       </div>
-    </div>
-  </div>
-)}
+  </>
+</Modal>
 
     </div>
   );

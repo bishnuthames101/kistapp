@@ -8,7 +8,8 @@ import { Clock, FileText, ArrowLeft, Check, Calendar, AlertCircle, Shield, Star,
 import { testPackages } from '@/data/labTests';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/contexts/ToastContext';
-import { laboratoryTests } from '@/services/api';
+import { laboratoryTests, errorMessage } from '@/services/api';
+import Modal from '@/components/Modal';
 
 export default function PackageDetailPage() {
   const params = useParams();
@@ -76,30 +77,11 @@ export default function PackageDetailPage() {
       setShowConfirmation(false);
       setSelectedDate('');
       setSelectedTime('');
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to book package:', error);
-      let errorMessage = 'Failed to book package';
-
-      if (error.response) {
-        if (error.response.data) {
-          if (typeof error.response.data === 'string') {
-            errorMessage = error.response.data;
-          } else if (typeof error.response.data === 'object') {
-            const errorDetails = Object.entries(error.response.data)
-              .map(([field, message]) => `${field}: ${message}`)
-              .join(', ');
-            errorMessage = errorDetails || errorMessage;
-          }
-        } else if (error.response.status === 401) {
-          errorMessage = 'Please login to book a package';
-        } else if (error.response.status === 403) {
-          errorMessage = 'You do not have permission to book this package';
-        } else if (error.response.status === 400) {
-          errorMessage = 'Invalid package booking data';
-        }
-      }
-
-      showToast(errorMessage, 'error');
+      // Previously inspected error.response, an axios shape that no longer
+      // exists, so every failure fell through to the generic message.
+      showToast(errorMessage(error, 'Failed to book package'), 'error');
     }
   };
 
@@ -298,10 +280,13 @@ export default function PackageDetailPage() {
       </div>
 
       {/* Booking Modal */}
-      {showBooking && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Schedule Your Test</h2>
+      <Modal
+        open={showBooking}
+        onClose={() => setShowBooking(false)}
+        title="Schedule Your Test"
+        labelledBy="booking-title"
+      >
+        <>
 
             <div className="mb-6">
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -353,15 +338,17 @@ export default function PackageDetailPage() {
                 Continue
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
 
       {/* Confirmation Modal */}
-      {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full mx-4 shadow-2xl">
-            <h2 className="text-2xl font-bold mb-6 text-gray-900">Confirm Your Booking</h2>
+      <Modal
+        open={showConfirmation}
+        onClose={() => setShowConfirmation(false)}
+        title="Confirm Your Booking"
+        labelledBy="confirm-title"
+      >
+        <>
 
             <div className="space-y-4 mb-6 bg-gray-50 p-4 rounded-lg">
               <div>
@@ -404,9 +391,8 @@ export default function PackageDetailPage() {
                 Confirm Booking
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>
+      </Modal>
     </div>
   );
 }

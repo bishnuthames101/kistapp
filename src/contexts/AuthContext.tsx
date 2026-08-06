@@ -3,7 +3,6 @@
 import { createContext, useContext, ReactNode } from 'react';
 import { useSession, signIn, signOut } from 'next-auth/react';
 import axios from 'axios';
-import { useInactivityTimeout } from '@/hooks/useInactivityTimeout';
 
 export interface User {
   id: string;
@@ -79,16 +78,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await signOut({ redirect: false });
   };
 
-  // Auto-logout after 90 seconds of inactivity
-  useInactivityTimeout({
-    timeout: 90000, // 90 seconds in milliseconds
-    onTimeout: () => {
-      if (user) {
-        logout();
-      }
-    },
-    enabled: !!user, // Only enable when user is logged in
-  });
+  // Inactivity is handled solely by <InactivityMonitor>, which warns before it
+  // signs anyone out. A second, silent timer used to live here and always fired
+  // first, so the warning never had a chance to appear.
 
   return (
     <AuthContext.Provider value={{ user, login, register, logout, loading }}>

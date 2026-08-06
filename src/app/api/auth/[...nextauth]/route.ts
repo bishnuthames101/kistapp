@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 import { NextRequest, NextResponse } from "next/server"
 import { authLimiter, getRateLimitHeaders } from "@/lib/ratelimit"
+import { inactivityTimeoutFor } from "@/lib/session-policy"
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -63,7 +64,7 @@ export const authOptions: NextAuthOptions = {
     signIn: "/login",
   },
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user }) {
       // On sign in, set initial data
       if (user) {
         token.id = user.id
@@ -73,19 +74,14 @@ export const authOptions: NextAuthOptions = {
         token.lastActivity = Date.now()
       }
 
-      // On any request (update trigger), check inactivity timeout
-      if (trigger === 'update' || !token.lastActivity) {
+      // Enforced on every token read, not only on an explicit update() from
+      // the client, so an idle session cannot be kept alive just by never
+      // calling update. Any authenticated request counts as activity.
+      if (token.id) {
         const now = Date.now()
-        const lastActivity = token.lastActivity as number || now
+        const lastActivity = (token.lastActivity as number) || now
 
-        // Different timeouts for admin vs patient
-        const inactivityTimeout = token.role === 'admin'
-          ? 90 * 1000  // 90 seconds for admin
-          : 120 * 1000 // 120 seconds (2 minutes) for patient
-
-        // Check if session has expired due to inactivity
-        if (now - lastActivity > inactivityTimeout) {
-          // Session expired, return null to force logout
+        if (now - lastActivity > inactivityTimeoutFor(token.role as string)) {
           return null as any
         }
 
@@ -107,7 +103,6 @@ export const authOptions: NextAuthOptions = {
           token.lastVerified = now
         }
 
-        // Update last activity timestamp
         token.lastActivity = now
       }
 

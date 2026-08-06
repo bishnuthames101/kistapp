@@ -1,11 +1,29 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
-import { User, Menu, X, ShoppingBag, FlaskRound as Flask } from 'lucide-react';
+import { User, Menu, X, ShoppingBag, FlaskRound as Flask, Stethoscope } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+
+/**
+ * /doctors, /about and /contact used to be reachable only from the footer,
+ * even though the doctor roster is the highest-intent page on a clinic site.
+ */
+const NAV_LINKS: ReadonlyArray<{
+  href: string;
+  label: string;
+  icon?: React.ComponentType<{ className?: string }>;
+}> = [
+  { href: '/', label: 'Home' },
+  { href: '/services', label: 'Services' },
+  { href: '/doctors', label: 'Doctors', icon: Stethoscope },
+  { href: '/lab-tests', label: 'Lab Tests', icon: Flask },
+  { href: '/epharmacy', label: 'ePharmacy', icon: ShoppingBag },
+  { href: '/about', label: 'About' },
+  { href: '/contact', label: 'Contact' },
+];
 
 export default function Navbar() {
   const { user, logout } = useAuth();
@@ -14,6 +32,7 @@ export default function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isVisible, setIsVisible] = useState(true);
   const [lastScrollY, setLastScrollY] = useState(0);
+  const userMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -25,6 +44,29 @@ export default function Navbar() {
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
   }, [lastScrollY]);
+
+  // The dropdown previously stayed open until its own button was clicked again.
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+
+    const onPointerDown = (event: MouseEvent | TouchEvent) => {
+      if (!userMenuRef.current?.contains(event.target as Node)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsUserMenuOpen(false);
+    };
+
+    document.addEventListener('mousedown', onPointerDown);
+    document.addEventListener('touchstart', onPointerDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown);
+      document.removeEventListener('touchstart', onPointerDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isUserMenuOpen]);
 
   const handleLogout = async () => {
     await logout();
@@ -53,22 +95,24 @@ export default function Navbar() {
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-5 lg:gap-8">
-            <Link href="/" className="text-gray-700 hover:text-blue-600">Home</Link>
-            <Link href="/services" className="text-gray-700 hover:text-blue-600">Services</Link>
-            <Link href="/lab-tests" className="text-gray-700 hover:text-blue-600 flex items-center">
-              <Flask className="w-4 h-4 mr-1" />
-              Lab Tests
-            </Link>
-            <Link href="/epharmacy" className="text-gray-700 hover:text-blue-600 flex items-center">
-              <ShoppingBag className="w-4 h-4 mr-1" />
-              ePharmacy
-            </Link>
+          <div className="hidden md:flex items-center gap-4 lg:gap-6">
+            {NAV_LINKS.map(({ href, label, icon: Icon }) => (
+              <Link
+                key={href}
+                href={href}
+                className="text-gray-700 hover:text-blue-600 flex items-center whitespace-nowrap"
+              >
+                {Icon && <Icon className="w-4 h-4 mr-1" />}
+                {label}
+              </Link>
+            ))}
 
             {user ? (
-              <div className="relative">
+              <div className="relative" ref={userMenuRef}>
                 <button
                   onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  aria-expanded={isUserMenuOpen}
+                  aria-haspopup="menu"
                   className="flex items-center space-x-2"
                 >
                   <div className="w-8 h-8 glass rounded-full flex items-center justify-center">
@@ -121,16 +165,17 @@ export default function Navbar() {
         {isMobileMenuOpen && (
           <div className="md:hidden py-4">
             <div className="flex flex-col space-y-4">
-              <Link href="/" className="text-gray-700 hover:text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>Home</Link>
-              <Link href="/services" className="text-gray-700 hover:text-blue-600" onClick={() => setIsMobileMenuOpen(false)}>Services</Link>
-              <Link href="/lab-tests" className="text-gray-700 hover:text-blue-600 flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
-                <Flask className="w-4 h-4 mr-1" />
-                Lab Tests
-              </Link>
-              <Link href="/epharmacy" className="text-gray-700 hover:text-blue-600 flex items-center" onClick={() => setIsMobileMenuOpen(false)}>
-                <ShoppingBag className="w-4 h-4 mr-1" />
-                ePharmacy
-              </Link>
+              {NAV_LINKS.map(({ href, label, icon: Icon }) => (
+                <Link
+                  key={href}
+                  href={href}
+                  className="text-gray-700 hover:text-blue-600 flex items-center"
+                  onClick={() => setIsMobileMenuOpen(false)}
+                >
+                  {Icon && <Icon className="w-4 h-4 mr-1" />}
+                  {label}
+                </Link>
+              ))}
 
               {user ? (
                 <>
