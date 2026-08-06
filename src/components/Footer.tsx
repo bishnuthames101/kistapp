@@ -49,6 +49,10 @@ export default function Footer() {
                   {siteConfig.address.area}, {siteConfig.address.street}
                   <br />
                   {siteConfig.address.locality} {siteConfig.address.postalCode}, Nepal
+                  <br />
+                  <span className="text-sm text-gray-400">
+                    {siteConfig.address.landmark}
+                  </span>
                 </span>
               </li>
             </ul>

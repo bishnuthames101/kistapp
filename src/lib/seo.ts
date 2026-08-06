@@ -32,13 +32,20 @@ export const siteConfig = {
     region: "Bagmati Province",
     postalCode: "44700",
     country: "NP",
-    /** Nearest well-known landmark, for directions copy. */
-    landmark: "near Balkumari Temple",
+    /**
+     * The landmark reception actually gives out on the phone. Chosen over the
+     * nearest map label because this is the one people already recognise.
+     */
+    landmark: "Just beside the Balkumari-Kharibot sky bridge on Ring Road",
   },
   geo: {
+    // Taken from the Google Maps place entry for the clinic (the same record
+    // the /contact embed is generated from), not from a Balkumari centroid.
     latitude: 27.670335,
     longitude: 85.338975,
   },
+  /** Canonical Google Maps listing. Links the site to the Business Profile. */
+  mapUrl: "https://maps.google.com/?cid=1933496181256067190",
   openingHours: {
     days: [
       "Sunday",
@@ -158,6 +165,7 @@ export function clinicJsonLd() {
     priceRange: "रु",
     currenciesAccepted: siteConfig.currency,
     address: postalAddress,
+    hasMap: siteConfig.mapUrl,
     geo: {
       "@type": "GeoCoordinates",
       latitude: siteConfig.geo.latitude,

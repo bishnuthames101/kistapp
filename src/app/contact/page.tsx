@@ -4,8 +4,10 @@ import { pageMetadata, siteConfig, formattedAddress } from '@/lib/seo';
 
 export const metadata = pageMetadata({
   title: 'Contact Us',
+  // Kept under ~160 characters so it is not truncated in search results. The
+  // landmark leads because it is what people actually search and recognise.
   description:
-    `Contact Kist Poly Clinic, ${formattedAddress}. Call ${siteConfig.telephone} or email ${siteConfig.email} to book an appointment. Open Sunday to Saturday, 7 AM to 8 PM.`,
+    `Kist Poly Clinic, beside the Balkumari-Kharibot sky bridge on Ring Road, ${siteConfig.address.locality}. Call ${siteConfig.telephone} to book. Open daily, 7 AM to 8 PM.`,
   path: '/contact',
   keywords: ['Kist Poly Clinic contact', 'clinic phone number Lalitpur', 'book appointment Lalitpur'],
 });
@@ -71,7 +73,17 @@ export default function ContactPage() {
                   <div>
                     <h3 className="font-medium">Address</h3>
                     <p className="text-gray-600">{formattedAddress}, Nepal</p>
-                    <p className="text-sm text-gray-500">{siteConfig.address.landmark}</p>
+                    <p className="mt-1 font-medium text-blue-700">
+                      {siteConfig.address.landmark}
+                    </p>
+                    <a
+                      href={siteConfig.mapUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-2 inline-block text-sm text-blue-600 hover:text-blue-800 underline"
+                    >
+                      Open in Google Maps
+                    </a>
                   </div>
                 </div>
                 <div className="flex items-start">
