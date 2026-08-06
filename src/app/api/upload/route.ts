@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin, STORAGE_BUCKETS } from "@/lib/supabase"
 import { requireAuth } from "@/lib/auth"
+import { uploadLimiter, getRateLimitHeaders } from "@/lib/ratelimit"
 
 const ALLOWED_TYPES: Record<string, string[]> = {
   medicines: ["image/jpeg", "image/png", "image/webp"],
@@ -8,11 +9,35 @@ const ALLOWED_TYPES: Record<string, string[]> = {
   "medical-records": ["application/pdf", "image/jpeg", "image/png"],
 }
 
+// The extension is derived from the validated MIME type rather than the
+// client-supplied filename, so an attacker cannot pick the stored extension.
+const EXTENSION_FOR_TYPE: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "application/pdf": "pdf",
+}
+
+// Only the medicines bucket holds non-sensitive marketing imagery, so it is the
+// only one that may be uploaded by a non-admin without extra scrutiny.
+const ADMIN_ONLY_BUCKETS: string[] = [STORAGE_BUCKETS.MEDICINES]
+
 // POST /api/upload - Upload file to Supabase Storage
 export async function POST(req: NextRequest) {
   try {
     const { user, error: authError } = await requireAuth()
     if (authError) return authError
+
+    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anonymous"
+    const { success, limit, reset, remaining } = await uploadLimiter.limit(
+      `${user!.id}:${ip}`
+    )
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many uploads. Please try again later." },
+        { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
+      )
+    }
 
     const formData = await req.formData()
     const file = formData.get("file") as File
@@ -34,11 +59,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    // Only staff may publish medicine catalogue images
+    if (ADMIN_ONLY_BUCKETS.includes(bucket) && user!.role !== "admin") {
+      return NextResponse.json(
+        { error: "Forbidden - Admin access required" },
+        { status: 403 }
+      )
+    }
+
     // Validate MIME type against allowed types for bucket
     const allowedTypes = ALLOWED_TYPES[bucket]
-    if (allowedTypes && !allowedTypes.includes(file.type)) {
+    if (!allowedTypes || !allowedTypes.includes(file.type)) {
       return NextResponse.json(
-        { error: `Invalid file type. Allowed types for ${bucket}: ${allowedTypes.join(", ")}` },
+        {
+          error: `Invalid file type. Allowed types for ${bucket}: ${(allowedTypes ?? []).join(", ")}`,
+        },
         { status: 400 }
       )
     }
@@ -52,9 +87,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Generate unique filename
-    const fileExt = file.name.split(".").pop()
-    const fileName = `${user!.id}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+    // Generate unique filename. The extension comes from the validated MIME
+    // type, never from file.name, which is fully attacker-controlled.
+    const fileExt = EXTENSION_FOR_TYPE[file.type]
+    const fileName = `${user!.id}/${Date.now()}-${crypto.randomUUID()}.${fileExt}`
 
     // Convert file to buffer
     const arrayBuffer = await file.arrayBuffer()

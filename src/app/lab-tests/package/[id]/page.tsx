@@ -186,8 +186,8 @@ export default function PackageDetailPage() {
               {/* Price */}
               <div className="mb-6 p-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg">
                 <div className="flex items-baseline gap-2">
-                  <span className="text-4xl font-bold text-blue-600">₹{pkg.price.toLocaleString()}</span>
-                  <span className="text-gray-500 line-through">₹{Math.round(pkg.price * 1.4).toLocaleString()}</span>
+                  <span className="text-4xl font-bold text-blue-600">Rs. {pkg.price.toLocaleString()}</span>
+                  <span className="text-gray-500 line-through">Rs. {Math.round(pkg.price * 1.4).toLocaleString()}</span>
                   <span className="text-green-600 font-semibold text-sm bg-green-100 px-2 py-1 rounded">
                     Save {Math.round(((pkg.price * 1.4 - pkg.price) / (pkg.price * 1.4)) * 100)}%
                   </span>
@@ -381,7 +381,7 @@ export default function PackageDetailPage() {
               </div>
               <div className="pt-4 border-t border-gray-200">
                 <p className="text-sm text-gray-600">Total Amount</p>
-                <p className="text-2xl font-bold text-blue-600">₹{pkg.price.toLocaleString()}</p>
+                <p className="text-2xl font-bold text-blue-600">Rs. {pkg.price.toLocaleString()}</p>
               </div>
               <div className="pt-2">
                 <p className="font-semibold text-gray-800">Payment Method</p>

@@ -20,6 +20,13 @@ export const apiLimiter = new Ratelimit({
   prefix: "rl:api",
 })
 
+// 20 uploads per hour per user (file uploads are expensive and land in storage)
+export const uploadLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(20, "1 h"),
+  prefix: "rl:upload",
+})
+
 export function getRateLimitHeaders(
   limit: number,
   remaining: number,

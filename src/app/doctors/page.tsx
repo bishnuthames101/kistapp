@@ -1,116 +1,53 @@
 import { Calendar } from 'lucide-react';
 import Link from 'next/link';
+import { doctors } from '@/data/doctors';
 
-export const metadata = {
-  title: 'Our Doctors - KIST Poly Clinic',
-  description: 'Meet our team of experienced medical professionals.',
-};
+import JsonLd from '@/components/JsonLd';
+import { absoluteUrl, breadcrumbJsonLd, pageMetadata, physicianJsonLd } from '@/lib/seo';
 
-const doctors = [
-  {
-    id: 1,
-    name: "Dr. Prabhakar Shah",
-    specialty: "Consultant General, Laparoscopic & Laser Surgeon",
-    education: "MBBS, MUMS MS (Pakistan)",
-    experience: "10+ years",
-    image: "/doctors/Prabhakar Shah.jpg",
-    schedule: "Time schedule changes every week",
-    opdCharge: 800,
-    nmcNumber: "8698"
-  },
-  {
-    id: 2,
-    name: "Dr. Arbind Sah",
-    specialty: "Senior Consultant Physician",
-    education: "MBBS, MD (Internal Medicine)",
-    experience: "7+ years",
-    image: "/doctors/Arbind Sah.jpg",
-    schedule: "Sun-Wed: 10AM - 5PM",
-    opdCharge: 650,
-    nmcNumber: "9037"
-  },
-  {
-    id: 3,
-    name: "Dr. Ranjit Sah",
-    specialty: "Consultant Orthopedic Surgeon",
-    education: "MBBS (KU), MS Orthopedic (KEMU, Pakistan)",
-    experience: "7+ years",
-    image: "/doctors/Ranjit Sah.jpg",
-    schedule: "Mon-Fri: 11AM - 2PM",
-    opdCharge: 650,
-    nmcNumber: "10861"
-  },
-  {
-    id: 4,
-    name: "Dr. Bibek Joshi",
-    specialty: "Radiologist, USG Specialist",
-    education: "MBBS, MD (Radiology)",
-    experience: "20+ years",
-    image: "https://images.unsplash.com/photo-1612349317150-e413f6a5b16d?auto=format&fit=crop&q=80&w=400",
-    schedule: "On call appointment (except Saturday)",
-    opdCharge: 650,
-    nmcNumber: "623"
-  },
-  {
-    id: 5,
-    name: "Dr. Ram Krishna Giri",
-    specialty: "Consultant Immunologist and Rheumatologist",
-    education: "MBBS, MD, FCIR",
-    experience: "10+ years",
-    image: "/doctors/Ram Krishna Giri.jpg",
-    schedule: "Every third Saturday of each month",
-    opdCharge: 800,
-    nmcNumber: "6728"
-  },
-  {
-    id: 6,
-    name: "Dr. Laxman Kuwar",
-    specialty: "Radiologist, X-ray Reporting Specialist",
-    education: "MBBS, MD (Radiology)",
-    experience: "20+ years",
-    image: "https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&q=80&w=400",
-    schedule: "On call appointment",
-    opdCharge: 650,
-    nmcNumber: "2568"
-  },
-  {
-    id: 7,
-    name: "Dr. Sukhesh Purush Dhakal",
-    specialty: "Senior Consultant Physician & Endocrinologist (Sugar and Thyroid Specialist)",
-    education: "MBBS, MD (HONS) Internal Medicine, Member ACP USA",
-    experience: "10+ years",
-    image: "/doctors/Sukhesh Purush Dhakal.jpg",
-    schedule: "On call appointment",
-    opdCharge: 800,
-    nmcNumber: "8216"
-  },
-  {
-    id: 8,
-    name: "Dr. Jitendra Singh",
-    specialty: "Obstetrician & Gynecologist, Laparoscopic Surgeon, Infertility Specialist",
-    education: "MBBS (TU), MD (NAMS, BIR Hospital)",
-    experience: "5+ years",
-    image: "/doctors/Jitendra Singh.jpg",
-    schedule: "On call appointment",
-    opdCharge: 825,
-    nmcNumber: "16819"
-  },
-  {
-    id: 9,
-    name: "Dr. Jitendra Prasad Yadav",
-    specialty: "Senior Consultant Physician & Neurologist",
-    education: "MBBS, MD, FICN",
-    experience: "10+ years",
-    image: "/doctors/Jitendra Prasad Yadav.jpg",
-    schedule: "On call appointment",
-    opdCharge: 800,
-    nmcNumber: "8029"
-  }
-];
+export const metadata = pageMetadata({
+  title: 'Our Doctors',
+  description:
+    'Meet the doctors at KIST Poly Clinic, Lalitpur - physicians, surgeons, orthopedic, gynecology, neurology, endocrinology and radiology specialists. View schedules and consultation fees.',
+  path: '/doctors',
+  keywords: ['doctors in Lalitpur', 'best physician Lalitpur', 'specialist doctor Nepal', 'NMC registered doctors'],
+});
+
+
 
 export default function DoctorsPage() {
+  // An ItemList of Physician entities so each doctor is discoverable from the
+  // roster page, not only from their own profile.
+  const doctorListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Doctors at KIST Poly Clinic',
+    itemListElement: doctors.map((doctor, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: absoluteUrl(`/doctors/${doctor.id}`),
+      item: physicianJsonLd({
+        name: doctor.name,
+        specialty: doctor.specialty,
+        image: doctor.image.startsWith('/') ? doctor.image : undefined,
+        path: `/doctors/${doctor.id}`,
+        opdCharge: doctor.opdCharge,
+        education: doctor.education,
+      }),
+    })),
+  };
+
   return (
     <div className="py-16 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <JsonLd
+        data={[
+          doctorListJsonLd,
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Doctors', path: '/doctors' },
+          ]),
+        ]}
+      />
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <div className="glass-card inline-block p-8">

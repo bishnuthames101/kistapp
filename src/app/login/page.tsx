@@ -1,10 +1,14 @@
 import { Suspense } from 'react';
 import LoginForm from '@/components/auth/LoginForm';
 
-export const metadata = {
-  title: 'Login - KIST Poly Clinic',
-  description: 'Sign in to your account',
-};
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Patient Login',
+  description: 'Sign in to your KIST Poly Clinic account to manage appointments, lab tests and pharmacy orders.',
+  path: '/login',
+  noIndex: true,
+});
 
 export default function LoginPage() {
   return (

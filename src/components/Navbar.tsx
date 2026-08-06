@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import Image from 'next/image';
 import { User, Menu, X, ShoppingBag, FlaskRound as Flask } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -35,11 +36,24 @@ export default function Navbar() {
     <nav className={`glass-navbar sticky top-0 z-50 transform transition-transform duration-300 ${isVisible ? 'translate-y-0' : '-translate-y-full'}`}>
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center py-4">
-          <Link href="/" className="text-2xl font-bold text-blue-600">
-            KIST Poly Clinic
+          <Link href="/" className="flex items-center gap-3 shrink-0" aria-label="KIST Poly Clinic home">
+            <Image
+              src="/logo.jpg"
+              alt=""
+              width={48}
+              height={48}
+              priority
+              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full object-cover ring-1 ring-blue-600/20"
+            />
+            <span className="flex flex-col leading-tight">
+              <span className="text-lg sm:text-xl font-bold text-blue-600">KIST Poly Clinic</span>
+              <span className="hidden lg:block text-[11px] text-gray-500">
+                &amp; Medical Center &middot; Estd. 2067
+              </span>
+            </span>
           </Link>
 
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center gap-5 lg:gap-8">
             <Link href="/" className="text-gray-700 hover:text-blue-600">Home</Link>
             <Link href="/services" className="text-gray-700 hover:text-blue-600">Services</Link>
             <Link href="/lab-tests" className="text-gray-700 hover:text-blue-600 flex items-center">

@@ -1,14 +1,46 @@
 import Link from 'next/link';
 import { services } from '@/data/services';
 
-export const metadata = {
-  title: 'Our Services - KIST Poly Clinic',
-  description: 'Comprehensive healthcare services with experienced medical professionals.',
-};
+import JsonLd from '@/components/JsonLd';
+import { absoluteUrl, breadcrumbJsonLd, pageMetadata, serviceJsonLd } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Our Medical Services',
+  description:
+    'OPD consultation, general and laser surgery, piles treatment, orthopedics, ultrasound, ECG, X-ray, gynecology, neurology and doctor home visits at KIST Poly Clinic, Lalitpur.',
+  path: '/services',
+  keywords: ['medical services Lalitpur', 'OPD consultation Nepal', 'ultrasound Lalitpur', 'X-ray near me'],
+});
 
 export default function ServicesPage() {
+  const serviceListJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Medical services at KIST Poly Clinic',
+    itemListElement: services.map((service, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      url: absoluteUrl(`/services/${service.id}`),
+      item: serviceJsonLd({
+        name: service.name,
+        description: service.description,
+        price: service.price,
+        path: `/services/${service.id}`,
+      }),
+    })),
+  };
+
   return (
     <div className="py-16 bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      <JsonLd
+        data={[
+          serviceListJsonLd,
+          breadcrumbJsonLd([
+            { name: 'Home', path: '/' },
+            { name: 'Services', path: '/services' },
+          ]),
+        ]}
+      />
       <div className="container mx-auto px-4">
         <div className="text-center mb-12">
           <div className="glass-card inline-block p-8">

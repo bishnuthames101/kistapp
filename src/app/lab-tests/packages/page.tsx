@@ -180,7 +180,7 @@ export default function AllPackagesPage() {
                 <div className="flex justify-between items-center pt-4 border-t">
                   <div>
                     <p className="text-xs text-gray-500">Starting from</p>
-                    <p className="text-2xl font-bold text-blue-600">₹{pkg.price.toLocaleString()}</p>
+                    <p className="text-2xl font-bold text-blue-600">Rs. {pkg.price.toLocaleString()}</p>
                   </div>
                   <Link
                     href={user ? `/lab-tests/package/${pkg.id}` : '/login'}

@@ -89,6 +89,24 @@ export async function PATCH(
       )
     }
 
+    // Patients may only cancel their own appointment; confirming/completing
+    // an appointment is a clinic decision and is admin-only.
+    if (user!.role !== "admin") {
+      if (validated.status && validated.status !== "cancelled") {
+        return NextResponse.json(
+          { error: "Forbidden - only staff can change this status" },
+          { status: 403 }
+        )
+      }
+
+      if (existing.status === "completed" || existing.status === "cancelled") {
+        return NextResponse.json(
+          { error: `Cannot modify a ${existing.status} appointment` },
+          { status: 400 }
+        )
+      }
+    }
+
     const appointment = await prisma.appointment.update({
       where: { id },
       data: validated,

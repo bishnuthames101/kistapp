@@ -1,9 +1,14 @@
 import { Mail, Phone, MapPin } from 'lucide-react';
 
-export const metadata = {
-  title: 'Contact Us - KIST Poly Clinic',
-  description: 'Get in touch with KIST Poly Clinic for appointments and inquiries.',
-};
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Contact Us',
+  description:
+    'Contact KIST Poly Clinic, Balkumari-Kharibot, Lalitpur. Call +977-01-5202097 or email kistpolyclinic@gmail.com to book an appointment. Open Sunday to Saturday, 7 AM to 8 PM.',
+  path: '/contact',
+  keywords: ['KIST Poly Clinic contact', 'clinic phone number Lalitpur', 'book appointment Lalitpur'],
+});
 
 export default function ContactPage() {
   return (

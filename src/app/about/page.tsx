@@ -1,9 +1,14 @@
 import { Quote } from 'lucide-react';
 
-export const metadata = {
-  title: 'About Us - KIST Poly Clinic',
-  description: 'Learn about KIST Poly Clinic, our mission, vision, and commitment to healthcare excellence.',
-};
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'About Us',
+  description:
+    'KIST Poly Clinic has served Balkumari, Lalitpur since 2067 BS with modern facilities, experienced doctors and a NABL-certified laboratory. Learn about our mission and values.',
+  path: '/about',
+  keywords: ['about KIST Poly Clinic', 'clinic in Balkumari Lalitpur', 'trusted clinic Nepal'],
+});
 
 export default function AboutPage() {
   const testimonials = [

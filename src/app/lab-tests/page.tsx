@@ -3,10 +3,15 @@ import Image from 'next/image';
 import { Clock, FileText, AlertCircle, ArrowRight, ShoppingCart, Star, Package, Shield } from 'lucide-react';
 import { labTests, testPackages } from '@/data/labTests';
 
-export const metadata = {
-  title: 'Laboratory Tests - KIST Poly Clinic',
-  description: 'Get accurate and reliable diagnostic tests with quick turnaround times. Our state-of-the-art laboratory ensures precise results for better healthcare decisions.',
-};
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Laboratory Tests & Health Checkups',
+  description:
+    'Book NABL-certified lab tests at KIST Poly Clinic, Lalitpur. Blood tests, thyroid, diabetes, hormone and full body checkup packages with home sample collection and fast results.',
+  path: '/lab-tests',
+  keywords: ['lab test Lalitpur', 'blood test near me', 'full body checkup Nepal', 'home sample collection Lalitpur'],
+});
 
 export default function LabTestsPage() {
   // Get featured packages
@@ -131,7 +136,7 @@ export default function LabTestsPage() {
                   <div className="flex justify-between items-center pt-4 border-t">
                     <div>
                       <p className="text-xs text-gray-500">Starting from</p>
-                      <p className="text-xl font-bold text-blue-600">₹{pkg.price.toLocaleString()}</p>
+                      <p className="text-xl font-bold text-blue-600">Rs. {pkg.price.toLocaleString()}</p>
                     </div>
                     <div className="glass-button bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm font-semibold">
                       Book Now
@@ -176,7 +181,7 @@ export default function LabTestsPage() {
                   </div>
                 </div>
                 <div className="flex justify-between items-center pt-4 border-t">
-                  <span className="text-blue-600 font-bold text-lg">₹{test.price}</span>
+                  <span className="text-blue-600 font-bold text-lg">Rs. {test.price}</span>
                   <Link
                     href={`/lab-tests/test/${test.id}`}
                     className="glass-button bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-all text-sm font-semibold"

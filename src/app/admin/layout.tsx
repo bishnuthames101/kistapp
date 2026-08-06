@@ -2,6 +2,14 @@ import { redirect } from "next/navigation"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import AdminNavbar from "@/components/admin/AdminNavbar"
+import { pageMetadata } from "@/lib/seo"
+
+export const metadata = pageMetadata({
+  title: "Admin",
+  description: "Restricted staff area for KIST Poly Clinic.",
+  path: "/admin",
+  noIndex: true,
+})
 
 export default async function AdminLayout({
   children,

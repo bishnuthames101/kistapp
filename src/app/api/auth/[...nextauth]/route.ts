@@ -89,6 +89,24 @@ export const authOptions: NextAuthOptions = {
           return null as any
         }
 
+        // Re-read the account from the database so that a deactivated user or a
+        // demoted admin loses access without waiting for the JWT to expire.
+        // Throttled to once a minute to keep this off the hot path.
+        const lastVerified = (token.lastVerified as number) ?? 0
+        if (now - lastVerified > 60 * 1000) {
+          const current = await prisma.user.findUnique({
+            where: { id: token.id as string },
+            select: { isActive: true, role: true },
+          })
+
+          if (!current || !current.isActive) {
+            return null as any
+          }
+
+          token.role = current.role
+          token.lastVerified = now
+        }
+
         // Update last activity timestamp
         token.lastActivity = now
       }

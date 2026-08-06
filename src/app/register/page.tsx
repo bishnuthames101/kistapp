@@ -1,9 +1,13 @@
 import RegisterForm from '@/components/auth/RegisterForm';
 
-export const metadata = {
-  title: 'Register - KIST Poly Clinic',
-  description: 'Create a new account',
-};
+import { pageMetadata } from '@/lib/seo';
+
+export const metadata = pageMetadata({
+  title: 'Create an Account',
+  description: 'Register for a KIST Poly Clinic account to book appointments, order medicines and track lab tests.',
+  path: '/register',
+  noIndex: true,
+});
 
 export default function RegisterPage() {
   return (

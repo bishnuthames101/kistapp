@@ -125,15 +125,25 @@ export async function DELETE(
     // Delete file from Supabase Storage
     if (existing.prescriptionImageUrl) {
       try {
-        // Extract file path from URL
+        // Extract the object key from the public URL. Uploads are stored under
+        // `<userId>/<file>`, so we must keep everything after the bucket name -
+        // taking only the last segment silently fails to delete the file.
         const url = new URL(existing.prescriptionImageUrl)
-        const pathParts = url.pathname.split('/')
-        const fileName = pathParts[pathParts.length - 1]
+        const marker = `/${STORAGE_BUCKETS.PRESCRIPTIONS}/`
+        const markerIndex = url.pathname.indexOf(marker)
+
+        if (markerIndex === -1) {
+          throw new Error("Prescription URL does not point at the prescriptions bucket")
+        }
+
+        const objectKey = decodeURIComponent(
+          url.pathname.slice(markerIndex + marker.length)
+        )
 
         // Delete from storage
         const { error: deleteError } = await supabaseAdmin.storage
           .from(STORAGE_BUCKETS.PRESCRIPTIONS)
-          .remove([fileName])
+          .remove([objectKey])
 
         if (deleteError) {
           console.error('Failed to delete file from storage:', deleteError)
