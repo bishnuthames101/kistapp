@@ -2,6 +2,12 @@ import { Phone, Mail, MapPin, Clock, Facebook, Instagram} from 'lucide-react';
 import { FaTiktok } from 'react-icons/fa';
 import { siteConfig } from '@/lib/seo';
 
+const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
+  Facebook,
+  Instagram,
+  TikTok: FaTiktok,
+};
+
 export default function Footer() {
   return (
     <footer className="bg-gray-900 text-gray-300">
@@ -12,9 +18,21 @@ export default function Footer() {
             <h3 className="text-xl font-bold text-white mb-4">Kist Poly Clinic</h3>
             <p className="mb-4">Providing quality healthcare services with modern facilities and experienced professionals.</p>
             <div className="flex space-x-4">
-              <a href="https://www.facebook.com/share/16mp3AtNCs/?mibextid=wwXIfr" className="hover:text-blue-400"><Facebook size={20} /></a>
-              <a href="https://www.instagram.com/kistpolyclinic8?igsh=MXB0c2tsN3o0aGphNQ%3D%3D&utm_source=qr" className="hover:text-blue-400"><Instagram size={20} /></a>
-              <a href="https://www.tiktok.com/@kistpolyclinic?_t=ZS-8un3nxG06Ip&_r=1" className="hover:text-blue-400"><FaTiktok size={20} /></a>
+              {siteConfig.social.map(({ name, url }) => {
+                const Icon = SOCIAL_ICONS[name];
+                return (
+                  <a
+                    key={name}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label={`Kist Poly Clinic on ${name}`}
+                    className="hover:text-blue-400"
+                  >
+                    <Icon size={20} />
+                  </a>
+                );
+              })}
             </div>
           </div>
 

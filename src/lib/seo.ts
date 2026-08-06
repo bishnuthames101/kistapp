@@ -59,8 +59,18 @@ export const siteConfig = {
     opens: "07:00",
     closes: "20:00",
   },
+  /**
+   * Canonical profile URLs - no share redirects, no tracking parameters.
+   * These are emitted as `sameAs`, which is how Google ties these profiles to
+   * the clinic entity, so a redirect or a `?igsh=` suffix weakens the match.
+   */
   social: [
-    "https://www.tiktok.com/@kistpolyclinic",
+    {
+      name: "Facebook",
+      url: "https://www.facebook.com/people/Kist-Polyclinic-And-Medical-Center-PvtLtd/100057331034427/",
+    },
+    { name: "Instagram", url: "https://www.instagram.com/kistpolyclinic8" },
+    { name: "TikTok", url: "https://www.tiktok.com/@kistpolyclinic" },
   ],
   /** Prices across the site are quoted in Nepalese Rupees. */
   currency: "NPR",
@@ -179,7 +189,7 @@ export function clinicJsonLd() {
         closes: siteConfig.openingHours.closes,
       },
     ],
-    sameAs: siteConfig.social,
+    sameAs: siteConfig.social.map((profile) => profile.url),
     medicalSpecialty: [
       "PrimaryCare",
       "InternalMedicine",
