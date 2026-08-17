@@ -1,205 +1,139 @@
-# Kist Poly Clinic - Next.js Frontend
+# Kist Poly Clinic
 
-This is the Next.js version of the Kist Poly Clinic frontend application, migrated from React + Vite.
+Patient-facing web app for Kist Poly Clinic, Balkumari-Kharibot, Lalitpur, Nepal.
+Appointment booking against real doctor schedules, lab test and health checkup
+packages, an online pharmacy, a patient dashboard and an admin panel.
 
-## Features
+**Current status and the outstanding work are in [`todo.md`](./todo.md).** Read it
+before starting anything — several things that look finished are blocked on
+database access.
 
-- ✅ Next.js 14 with App Router
-- ✅ TypeScript
-- ✅ Tailwind CSS with custom glass-morphism design
-- ✅ Authentication (JWT-based)
-- ✅ Protected routes with middleware
-- ✅ Context API for state management
-- ✅ Axios for API calls
-- ✅ Responsive design
+## Stack
 
-## Tech Stack
+| | |
+|---|---|
+| Framework | Next.js 16 (App Router, React 19) |
+| Language | TypeScript |
+| Styling | Tailwind CSS v4 |
+| Auth | NextAuth v4, credentials provider, JWT sessions in httpOnly cookies |
+| Database | PostgreSQL (Supabase) via Prisma 7 |
+| Storage | Supabase Storage |
+| Rate limiting | Upstash Redis, with an in-memory fallback that never throws |
+| Email | Resend |
+| Tests | Vitest (unit), Playwright (e2e) |
+| Hosting | Vercel |
 
-- **Framework:** Next.js 14
-- **Language:** TypeScript
-- **Styling:** Tailwind CSS
-- **State Management:** React Context API
-- **HTTP Client:** Axios
-- **Icons:** Lucide React, React Icons
+## Getting started
 
-## Getting Started
-
-### Prerequisites
-
-- Node.js 18+ installed
-- Backend API running at `http://192.168.1.70:8000/api` (or update `.env.local`)
-
-### Installation
+Requires Node 18+ and a PostgreSQL database.
 
 ```bash
-cd frontend-nextjs
 npm install
+npm run db:migrate     # apply migrations
+npm run db:seed        # load the 9 doctors and their weekly schedules
+npm run dev            # http://localhost:3000
 ```
 
-### Environment Variables
+### Environment variables
 
-Create or update `.env.local`:
+`.env` is gitignored and has never been committed. Set these in Vercel as well as
+locally:
 
-```env
-NEXT_PUBLIC_API_URL=http://192.168.1.70:8000/api
-```
+| Variable | Required | Notes |
+|---|---|---|
+| `DATABASE_URL` | yes | Pooled Supabase connection |
+| `DIRECT_URL` | yes | Direct connection, for migrations |
+| `NEXTAUTH_SECRET` | yes | Session signing |
+| `NEXTAUTH_URL` | yes | Also used to build password-reset links |
+| `NEXT_PUBLIC_APP_URL` | yes | Preferred source for password-reset links |
+| `NEXT_PUBLIC_SUPABASE_URL` | yes | |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | yes | |
+| `SUPABASE_SERVICE_ROLE_KEY` | yes | Server-side storage writes |
+| `UPSTASH_REDIS_REST_URL` | no | Falls back to an in-memory limiter |
+| `UPSTASH_REDIS_REST_TOKEN` | no | |
+| `RESEND_API_KEY` | no | Without it, emails are logged instead of sent |
+| `RESEND_FROM_EMAIL` | no | Domain must be verified in Resend |
+| `TRUSTED_PROXY_HEADER` | no | Only set if a proxy that overwrites it is in front |
+| `NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` | no | Search Console |
 
-### Development
-
-```bash
-npm run dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Build for Production
-
-```bash
-npm run build
-npm start
-```
-
-### Linting
-
-```bash
-npm run lint
-```
-
-## Project Structure
-
-```
-frontend-nextjs/
-├── src/
-│   ├── app/                  # Next.js app directory
-│   │   ├── page.tsx         # Home page
-│   │   ├── layout.tsx       # Root layout
-│   │   ├── providers.tsx    # Context providers
-│   │   ├── globals.css      # Global styles
-│   │   ├── login/           # Login page
-│   │   ├── register/        # Register page
-│   │   └── dashboard/       # Dashboard page
-│   ├── components/          # Reusable components
-│   │   ├── Navbar.tsx
-│   │   ├── Footer.tsx
-│   │   └── auth/            # Auth-related components
-│   ├── contexts/            # React Context providers
-│   │   ├── AuthContext.tsx
-│   │   ├── CartContext.tsx
-│   │   └── ToastContext.tsx
-│   ├── services/            # API services
-│   │   └── api.ts           # Axios instance and API calls
-│   ├── types/               # TypeScript type definitions
-│   ├── data/                # Static data
-│   └── middleware.ts        # Next.js middleware for route protection
-├── public/                  # Static assets
-├── .env.local              # Environment variables
-├── next.config.ts          # Next.js configuration
-├── tailwind.config.ts      # Tailwind CSS configuration
-├── tsconfig.json           # TypeScript configuration
-├── MIGRATION_GUIDE.md      # Detailed migration guide
-└── package.json            # Dependencies
-```
-
-## Migration Status
-
-### ✅ Completed
-
-- Core Next.js setup
-- Tailwind CSS configuration
-- API services layer
-- Context providers (Auth, Cart, Toast)
-- Core components (Navbar, Footer, Auth forms)
-- Core pages (Home, Login, Register, Dashboard)
-- Middleware for protected routes
-
-### 🚧 In Progress
-
-- Remaining 16 pages need migration
-- Some dashboard sub-pages
-- Additional components
-
-See `MIGRATION_GUIDE.md` for detailed migration instructions.
-
-## Available Routes
-
-### Public Routes
-- `/` - Home page
-- `/login` - Login page
-- `/register` - Register page
-- `/about` - About page (to be migrated)
-- `/contact` - Contact page (to be migrated)
-- `/services` - Services listing (to be migrated)
-- `/doctors` - Doctors listing (to be migrated)
-- `/lab-tests` - Lab tests (to be migrated)
-- `/epharmacy` - Online pharmacy (to be migrated)
-
-### Protected Routes
-- `/dashboard` - User dashboard
-- `/dashboard/*` - Dashboard sub-pages (to be migrated)
-
-## API Integration
-
-The app connects to the Django backend API. All API calls are centralized in `src/services/api.ts`.
-
-### Example API Usage
-
-```typescript
-import { auth, appointments, medicines } from '@/services/api';
-
-// Login
-await auth.login(phone, password);
-
-// Get appointments
-const response = await appointments.getAll();
-
-// Get medicines
-const medicines = await medicines.getAll();
-```
-
-## Authentication Flow
-
-1. User logs in via `/login`
-2. JWT token stored in localStorage
-3. Token added to all API requests via Axios interceptor
-4. Protected routes checked by middleware
-5. Unauthenticated users redirected to `/login`
-
-## Custom Styles
-
-The app uses a custom glass-morphism design with Tailwind CSS utility classes defined in `globals.css`:
-
-- `.glass` - Base glass effect
-- `.glass-card` - Card with glass effect
-- `.glass-button` - Primary button with glass effect
-- `.glass-input` - Input field with glass effect
-- `.glass-navbar` - Navbar with glass effect
+Password reset **refuses to send** if neither `NEXT_PUBLIC_APP_URL` nor
+`NEXTAUTH_URL` is set, and logs why. That is deliberate: the previous fallback
+took the link's host from the request, which is attacker-controlled and was an
+account-takeover path.
 
 ## Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm start` - Start production server
-- `npm run lint` - Run ESLint
+```bash
+npm run dev          npm run build        npm start
+npm run lint         npm run typecheck
+npm run test         npm run test:watch   npm run test:e2e
+npm run db:migrate   npm run db:seed
+```
 
-## Contributing
+**All four of `lint`, `typecheck`, `test` and `build` must pass before you
+commit.** CI runs them on every push, plus e2e against a throwaway Postgres.
+`lint` currently reports 0 errors and ~56 warnings; the warnings are tolerated on
+purpose so CI stays green.
 
-When adding new pages:
+Note that **`build` succeeds even with the database unreachable**, so a green
+build is not evidence that a schema change works.
 
-1. Create page in `src/app/[route]/page.tsx`
-2. Add metadata export for SEO
-3. Use 'use client' directive if using hooks
-4. Update imports from React Router to Next.js
-5. Test routing and functionality
+## Layout
 
-See `MIGRATION_GUIDE.md` for detailed migration patterns.
+```
+src/
+  app/                Routes; api/ holds all route handlers
+  components/         Shared UI (SlotPicker, InactivityMonitor, …)
+  contexts/           Auth, Cart, Toast providers  — note the plural
+  data/               Static content: doctors, services, lab packages
+  lib/                Server logic — see below
+  proxy.ts            Route protection + rate limiting (was middleware.ts)
+prisma/
+  schema.prisma       Models
+  migrations/         Includes three not yet applied — see todo.md
+  seed.ts             Mirrors src/data/doctors.ts into the database
+tests/                Vitest unit tests
+e2e/                  Playwright smoke test
+```
 
-## License
+`src/lib/` is where the logic that has actually broken lives, and where to look
+first:
 
-ISC
+| File | Responsibility |
+|---|---|
+| `slots.ts` | Slot arithmetic — pure and database-free, so it is exhaustively testable |
+| `doctors.ts` | Doctor lookup by cuid, slug or legacy id |
+| `password.ts` | Hashing policy, cost, and the anti-enumeration dummy hash |
+| `password-reset.ts` | Reset token lifecycle |
+| `mailer.ts` | Resend wrapper; logs instead of sending when unconfigured |
+| `ratelimit.ts` | Limiter definitions and `checkLimit`, which never throws |
+| `request-ip.ts` | Which header may be trusted for the client IP |
+| `session-policy.ts` | Inactivity timeouts by role |
+| `seo.ts` | Single source of truth for NAP data, metadata and JSON-LD |
+
+## Notes for anyone picking this up
+
+**Doctors have two booking modes.** Only 2 of the 9 keep fixed hours
+(`scheduled`) and the patient picks an exact time; the other 7 are `on_call` and
+the patient submits a preferred date for the clinic to confirm by phone. Do not
+generate slots for on-call doctors — showing a timetable that does not exist is
+what the current booking system was built to stop.
+
+**`src/data/doctors.ts` is content, the database is authority.** The file drives
+static generation of the marketing pages; `prisma/seed.ts` mirrors it into the
+`Doctor` table, which is what booking reads. Re-run `db:seed` after editing it.
+
+**Double-booking is prevented by a partial unique index**, not by the
+availability check — two requests can both pass the check, and only one can win
+at the database. The loser gets a clean 409. The index is raw SQL in the
+migration because Prisma cannot express a partial index.
+
+**The prescription feature is disabled, not deleted.** Each affected file keeps
+its original implementation in a block comment.
+`src/app/api/prescriptions/route.ts` lists every file to touch when re-enabling
+and the two security fixes that must land first.
 
 ## Contact
 
-Kist Poly Clinic
-- Phone: +977-01-5202097
-- Email: kistpolyclinic@gmail.com
-- Address: Balkumari-Kharibot, Lalitpur, Nepal
+Kist Poly Clinic — Balkumari-Kharibot, Lalitpur, Nepal
++977-01-5202097 · kistpolyclinic@gmail.com

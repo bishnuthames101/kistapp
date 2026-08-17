@@ -1,108 +1,266 @@
-# Kist Poly Clinic — what's next
+# Kist Poly Clinic — status and what's next
 
-Status as of **2026-08-17** (re-checked; previous status was 2026-08-16).
-Everything previously listed as done has been removed from this file; `git log`
-is the record of it.
+Status as of **2026-08-17**.
 
-The code is in good shape — `npm run lint` (0 errors, 56 warnings),
-`npm run typecheck`, `npm run test` (78 passing) and `npm run build` were all
-re-run on 2026-08-17 and all pass.
-
-**The problem is not the code, it is everything downstream of it.** Work through
-[Do these first](#do-these-first-2026-08-17) before starting any new feature.
-
-The headline *feature* item is still SMS + email confirmation, but it is blocked
-on step 1 below (it needs a live database).
+This is the single living document for the project. `did.md` and `handover.md`
+were merged into it and deleted — they were session records whose "what I did"
+sections `git log` already holds, and whose action items had drifted out of date
+in three places. Anything still live from them is below. To read them anyway:
+`git show 2fde9ac:handover.md`.
 
 ---
 
-## ✅ Done on 2026-08-17
+## Status in one line
 
-- **Everything is committed and pushed.** The 2026-08-10 backlog went up as one
-  commit, followed by the security fixes and the cart/proxy work. `git log` is
-  now the record. CI will have run for the first time — check the Actions tab.
-- **Four security findings fixed**, all in code that had not shipped yet: the
-  password-reset link no longer derives its host from the request (it was a
-  reset-poisoning account takeover); the reset email is no longer awaited (the
-  timing gap re-created the account-enumeration oracle the generic response
-  removes); a completed reset now invalidates existing sessions via
-  `users.password_changed_at`; and `cf-connecting-ip` / `x-real-ip` /
-  `x-forwarded-for` are no longer trusted blindly, which was a free rate-limit
-  bypass on login, registration and password reset. Set `TRUSTED_PROXY_HEADER`
-  if you ever put a proxy in front.
-- `/api/health` is rate limited, the cart persists to localStorage, and
-  `src/middleware.ts` is now `src/proxy.ts`.
+**The code is in good shape and fully backed up. The running app is not**, because
+it has no working database connection — and nothing here has been verified
+against a live one.
+
+### Code: green
+
+| Check | Result |
+|---|---|
+| `npm run lint` | 0 errors, 56 warnings (warnings by choice, so CI stays green) |
+| `npm run typecheck` | clean |
+| `npm run test` | 78 passing, 5 files |
+| `npm run build` | exit 0 |
+
+Working tree clean, `master` in sync with `origin/master`.
+
+### What works right now
+
+Password reset exists and is sound end to end in code. Booking reflects real
+doctor schedules with a database-level guard against double-booking. Rate
+limiting no longer fails open on the wrong side, and no longer accepts forged
+identity headers. The cart survives a refresh. The NABL claim is gone from all 11
+places, including the metadata that would have kept asserting it to Google.
+
+### What is unverified — the important part
+
+**Nothing has been run against a real database, by anyone, ever.** `DATABASE_URL`
+cannot authenticate, so:
+
+- **Three of the five migrations have never been applied to any database**
+  (`password_reset_tokens`, `doctors_and_slots`, `user_password_changed_at`). The
+  last is the session-invalidation security fix, which is therefore inert code.
+- `db:seed` has never run, so there are no `Doctor` rows — booking has no data
+  behind it.
+- The Playwright smoke test has never executed against real data.
+- Nobody has clicked through booking or password reset on a deployed environment.
+
+Be careful how green that table reads: **`npm run build` succeeds with the
+database completely unreachable.** A passing build is not evidence that a schema
+change works. The 78 unit tests cover pure logic — slot arithmetic, token
+lifecycle, rate-limit fallbacks — and are deliberately database-free, so they
+cannot catch this either.
 
 ---
 
-## 🚨 Do these first (2026-08-17)
+## 🚨 Your action items
 
-In this order. All three need your credentials or a dashboard login; nobody can
-do them from the dev machine.
+In the order that unblocks the most. Items 1–3 are the ones to do first.
 
-### 1. The Supabase database password is wrong — the project is NOT deleted
+### Blocking — nothing downstream works until these are done
 
-This blocks everything else. **The previous entry here said the project looked
-deleted. That was wrong**, and this is the corrected finding. Re-probed on
-2026-08-17:
+**1. Reset the Supabase database password.**
+Dashboard → Settings → Database → Reset password. Then update `DATABASE_URL`
+**and** `DIRECT_URL` in `.env` *and* in Vercel's environment settings. The project
+is alive; only the password is stale (see [the probe](#the-supabase-project-is-not-deleted)).
+Then:
+
+```bash
+npm run db:migrate   # applies all three unapplied migrations
+npm run db:seed      # loads the 9 doctors + their weekly schedules
+```
+
+`db:seed` is idempotent and also backfills `doctor_id` on existing appointments
+by matching the stored doctor name. Re-run it after editing `src/data/doctors.ts`.
+
+**2. Set `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in Vercel** — not just `.env`;
+they are absent from both. Without them password reset works end to end but the
+email is written to the server log instead of sent, so **no patient can actually
+reset a password**. The sending domain must be verified in Resend first; the
+fallback sender only delivers to the Resend account owner.
+
+Keep `NEXT_PUBLIC_APP_URL` / `NEXTAUTH_URL` set in Vercel too. The reset route now
+refuses to send at all if neither is present, and logs why — deliberately, since
+the old fallback took the link's host from the request and was an account-takeover
+path.
+
+### Security — one dashboard check
+
+**3. Is the `medical-records` Supabase bucket public?**
+`/api/upload` hands out `getPublicUrl()` for it. If that bucket is public, anyone
+holding a URL reads a patient's medical records with no authentication. Storage →
+Buckets. If it is public, the code fix is `createSignedUrl` with a short TTL —
+say so and it can be done. **This is the last open item from the original audit.**
+
+### Verification — nobody has ever clicked through this
+
+**4. Smoke-test on a deployed environment**, once step 1 is done:
+
+- [ ] Book with **Dr. Arbind Sah** (scheduled) — you should see real slots from
+      his Sun–Wed hours, with taken ones greyed out rather than hidden.
+- [ ] Book the **same slot twice in two browsers** — the second must be refused
+      with "That slot has just been taken", not silently accepted.
+- [ ] Book with **Dr. Prabhakar Shah** (on call) — you should get an explanation
+      and a "Send Request" button, **not** a timetable.
+- [ ] Confirm the appointment appears in `/dashboard` and `/admin/appointments`.
+- [ ] Run the full password reset: request the link, click it, set a new password,
+      log in with it. Confirm the old password no longer works.
+- [ ] With a session open in a second browser, reset the password and confirm
+      that session is logged out (this is what migration 3 enables).
+- [ ] Confirm `/admin/prescriptions` 404s and `/api/prescriptions` returns 404.
+
+Or automatically, once the database is reachable:
+
+```bash
+npx playwright install --with-deps chromium
+npm run test:e2e
+```
+
+**5. Check the Actions tab on GitHub.** CI (`.github/workflows/ci.yml`) runs lint,
+typecheck, tests and build on every push, plus an end-to-end job against a
+throwaway Postgres. It ran for the first time on 2026-08-17. Run `gh auth login`
+on the dev machine if you want run results readable from the terminal.
+
+### Decisions needed from you
+
+**6. Confirm the two doctors' schedules.** Derived from the text in
+`src/data/doctors.ts`, not from you:
+
+| Doctor | Days | Hours | Slot length |
+|---|---|---|---|
+| Dr. Arbind Sah | Sun–Wed | 10:00–17:00 | 30 min |
+| Dr. Ranjit Sah | Mon–Fri | 11:00–14:00 | 20 min |
+
+Patients can now book against these, so a wrong entry books someone into a room
+with no doctor. **The other 7 are set to "on call"** — tell me if any of them
+actually keeps fixed hours and they can be added.
+
+**7. The remaining unsubstantiated claims** — same category as NABL, which was
+removed on request. See [Trust claims](#4-replace-or-substantiate-the-trust-claims).
+
+**8. SMS provider and budget**, if you want booking confirmations. See
+[the plan](#future-plan--sms--email-confirmation).
+
+**9. Fix the Google Business Profile copy** — "all kinds **pf** services",
+lowercase "kist poly clinic" and "balkumari-kharibot", "Xray"/"Ecg" →
+"X-ray"/"ECG". Also the Facebook page reads "Kist Polyclinic And Medical Center
+Pvt.Ltd." — "Polyclinic" as one word, a fourth spelling variant. The site, logo
+and GBP now agree on "Kist Poly Clinic".
+
+Related, from the SEO work: verify the domain in Google Search Console and set
+`NEXT_PUBLIC_GOOGLE_SITE_VERIFICATION` (the root layout picks it up
+automatically), then submit `https://kistpolyclinic.com.np/sitemap.xml` to Search
+Console and Bing Webmaster Tools.
+
+---
+
+## The Supabase project is not deleted
+
+Recorded here because an earlier version of this file concluded it was, and that
+conclusion blocked everything for a week.
 
 ```
-DATABASE_URL  → 28P01: password authentication failed for user "postgres"
-DIRECT_URL    → ENOTFOUND db.qjdjvigcqgypzagoczcn.supabase.co
+2026-08-16  DATABASE_URL → XX000: tenant/user postgres.qjdjvigcqgypzagoczcn not found
+2026-08-17  DATABASE_URL → 28P01: password authentication failed for user "postgres"
+            DIRECT_URL   → ENOTFOUND db.qjdjvigcqgypzagoczcn.supabase.co
 ```
 
-The earlier probe got `XX000: tenant not found`; it now gets past tenant lookup
-and fails on the *password*. The pooler resolving tenant
-`qjdjvigcqgypzagoczcn` means the project exists. The `ENOTFOUND` on `DIRECT_URL`
-is expected since Supabase deprecated the IPv4 direct host and is not evidence
-of deletion.
-
-**So the fix is small:** Supabase dashboard → Settings → Database → reset the
-database password, then update `DATABASE_URL` (and `DIRECT_URL`) in `.env` *and*
-in the Vercel project settings. Then run the migrations — see
-[Deploy steps](#deploy-steps).
-
-### 2. `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are still absent from `.env`
-
-Re-confirmed missing on 2026-08-17. Password reset therefore writes the email to
-the server log instead of sending it, so **no patient can actually reset a
-password**. Set them in the Vercel project settings, not just `.env`. Details in
-[Deploy steps](#deploy-steps).
-
-Note the reset route now *refuses to send at all* if neither
-`NEXT_PUBLIC_APP_URL` nor `NEXTAUTH_URL` is set, and logs why. Both are present
-today; keep them set in Vercel.
-
-### 3. Smoke-test on a deployed environment
-
-Nobody has ever clicked through the booking flow or the password reset. The
-six-item checklist is in `handover.md` §4. Do it once step 1 is resolved. Add one
-item: after resetting a password, confirm the old session is logged out.
-
-### 4. Only then start SMS + email confirmation
-
-It needs a live database and a provider decision from you (Sparrow SMS vs
-AakashSMS vs Twilio). See the plan below.
+The second probe gets *past* tenant lookup and fails on the password, which means
+the pooler resolves tenant `qjdjvigcqgypzagoczcn` and the project exists. The
+`ENOTFOUND` on `DIRECT_URL` is Supabase's IPv4 direct-host deprecation, not a
+missing project. So the fix is a password reset, not a new project.
 
 ---
 
-## 🔜 Future plan — SMS + email confirmation
+## Still outstanding — engineering
+
+### 1. Order header with OrderItem children
+
+A 5-item cart is still 5 unrelated `PharmacyOrder` rows. No order ID, no single
+total, no shipping record. Create in one `prisma.$transaction`. The dashboard's
+"Order Details" table is hardcoded to render exactly one row.
+
+Related: **stock is a boolean enum**, not a quantity
+(`StockStatus { IN_STOCK | OUT_OF_STOCK }`), with no decrement on order, so
+overselling is guaranteed. The appointment work added a partial unique index to
+stop double-booking; pharmacy has the same class of bug and no equivalent guard.
+
+Delete `src/types/pharmacyOrder.ts` with this — it describes an order shape that
+does not exist (`items: CartItem[]`, `orderDate`) and will mislead.
+
+### 2. Commit to one visual system
+
+`globals.css` defines a complete glass-morphism vocabulary (20+ tokens). The
+homepage uses none of it — solid gradients and hand-rolled Tailwind.
+`/epharmacy` is fully glass. `/dashboard` is flat white cards. `/admin` is
+unstyled tables. Users cross three visual identities in four clicks. This is the
+biggest remaining driver of "feels vague".
+
+Recommendation: delete the glass system — frosted glass over gradients is poor
+for medical text legibility and contrast. Then rebuild the dashboard and admin
+against whatever you pick. The admin panel is unstyled scaffolding and it is
+where staff live all day.
+
+### 3. Reviews: build or remove
+
+`DoctorRating` accepts `reviews` and `canReview` props and renders a review form
+whose submit handler does nothing. Either build it (schema + endpoint) or delete
+it. With the `Doctor` table now in place, building it is much cheaper than it was.
+
+### 4. Replace or substantiate the trust claims
+
+- ~~**"NABL Certified"**~~ — **removed 2026-08-17** at the product owner's
+  request. All 11 occurrences across 7 files are gone, including the two that
+  were metadata rather than visible copy (the JSON-LD in `src/lib/seo.ts` and
+  `src/app/opengraph-image.tsx`), which would otherwise have kept asserting it to
+  Google and to link previews. Replaced with "in-house laboratory". Two adjacent
+  phrasings that made the same claim without naming NABL went with it.
+
+  If the clinic *does* hold a Nepali accreditation (NPHL, NAMS), it can now be
+  named honestly — nothing is claimed in its place. To re-check, grep `\bNABL\b`
+  **with the word boundaries**; a plain search also matches "UNABLE" and a
+  case-insensitive one matches "u**nabl**e" / "available".
+- **"15,000+ Happy Patients"** and **"50+ Expert Doctors"** — while `/doctors`
+  lists 9, contradicting the claim on the same site.
+- A hardcoded **"4.8 ★"** on every lab package.
+- Three testimonials with stock names and no source.
+
+### 5. Smaller things
+
+All re-verified as still open on 2026-08-17.
+
+- `<img>` tags instead of `next/image` (homepage hero, epharmacy cards, doctor
+  avatars) — no lazy-loading or CLS protection. **10 files.**
+- No skip link; several pages still lack landmark regions.
+- 56 lint warnings, mostly `catch (error: any)` left over from the axios client.
+  Warnings by choice so CI stays green; worth clearing gradually.
+- `src/services/api.ts` is largely dead legacy code — localStorage JWTs and
+  endpoints that no longer exist. Not exploitable (auth is cookie-based), but
+  misleading to read.
+- No error monitoring. Every failure path is `console.error` into the void.
+
+---
+
+## Future plan — SMS + email confirmation
 
 The clinic sends nothing to anyone. No booking confirmation, no reminder, no
 message when an appointment is confirmed or cancelled. In Nepal, for a clinic,
 the SMS *is* the reason a patient believes the booking happened — right now the
 only confirmation is a toast that disappears in three seconds.
 
-The plumbing already exists: `src/lib/mailer.ts` was added for password reset
-and wraps `resend` with a "log instead of send when unconfigured" fallback.
-Sending a booking email is a small addition to it. SMS needs a provider.
+The plumbing exists: `src/lib/mailer.ts` wraps `resend` with a "log instead of
+send when unconfigured" fallback. Sending a booking email is a small addition to
+it. SMS needs a provider.
 
 ### Scope
 
 **Email (via `resend`, already wired):**
 
-- Booking confirmation — doctor, date, time, OPD charge, clinic address.
-  For on-call doctors, say plainly that the clinic will call to fix a time.
+- Booking confirmation — doctor, date, time, OPD charge, clinic address. For
+  on-call doctors, say plainly that the clinic will call to fix a time.
 - Status change — when staff move an appointment to confirmed or cancelled.
 - Reminder the day before.
 
@@ -115,7 +273,7 @@ Sending a booking email is a small addition to it. SMS needs a provider.
 - Phone numbers are already validated to 10 digits starting with 9, so the data
   is clean enough to send to.
 
-### Things to decide before building
+### Decide before building
 
 1. **Provider and budget.** Roughly how many appointments a month? At ~NPR 1–2
    per SMS that sets the running cost.
@@ -138,125 +296,13 @@ Sending a booking email is a small addition to it. SMS needs a provider.
 
 ---
 
-## Deploy steps
-
-> **Blocked as of 2026-08-17** — the database password in `DATABASE_URL` is
-> wrong, so neither command below can run. Reset it in the Supabase dashboard
-> first; see
-> [Do these first, step 1](#1-the-supabase-database-password-is-wrong--the-project-is-not-deleted).
-
-Three migrations are written but **not applied** — `DATABASE_URL` points at
-production Supabase, so nothing was run against it automatically. The third,
-`20260817120000_user_password_changed_at`, is what makes a password reset log
-existing sessions out.
-
-```bash
-npm run db:migrate   # prisma migrate deploy
-npm run db:seed      # loads the 9 doctors + their weekly schedules
-```
-
-`db:seed` is idempotent and also backfills `doctor_id` on existing appointments
-by matching the stored doctor name. Re-run it after editing
-`src/data/doctors.ts`.
-
-**Also set `RESEND_API_KEY` and `RESEND_FROM_EMAIL`** — re-confirmed still
-missing from `.env` on 2026-08-16. Without them password
-reset still works end to end, but the email is written to the server log instead
-of being delivered — so nobody can actually reset a password. The sending domain
-must be verified in Resend.
-
----
-
-## Still outstanding
-
-### 1. Audit the Supabase storage buckets
-
-The prescription feature is switched off (see below), which removes the
-immediate exposure. But `/api/upload` still hands out `getPublicUrl()` for the
-`medical-records` bucket. If that bucket is public, anyone with the URL reads a
-patient's records with no authentication.
-
-**This is a Supabase dashboard check, not a code change.** Do it before anyone
-uploads a medical record. The fix in code is `createSignedUrl` with a short TTL.
-
-### 2. Order header with OrderItem children
-
-A 5-item cart is still 5 unrelated `PharmacyOrder` rows. No order ID, no single
-total, no shipping record. Create in one `prisma.$transaction`. The dashboard's
-"Order Details" table is hardcoded to render exactly one row.
-
-Related: **stock is a boolean enum**, not a quantity
-(`StockStatus { IN_STOCK | OUT_OF_STOCK }`), with no decrement on order, so
-overselling is guaranteed. The appointment work just added a partial unique
-index to stop double-booking; pharmacy has the same class of bug and no
-equivalent guard.
-
-Delete `src/types/pharmacyOrder.ts` with this — it describes an order shape that
-does not exist (`items: CartItem[]`, `orderDate`) and will mislead.
-
-### 3. Commit to one visual system
-
-`globals.css` defines a complete glass-morphism vocabulary (20+ tokens). The
-homepage uses none of it — solid gradients and hand-rolled Tailwind.
-`/epharmacy` is fully glass. `/dashboard` is flat white cards. `/admin` is
-unstyled tables. Users cross three visual identities in four clicks. This is the
-biggest remaining driver of "feels vague".
-
-Recommendation: delete the glass system — frosted glass over gradients is poor
-for medical text legibility and contrast. Then rebuild the dashboard and admin
-against whatever you pick. The admin panel is unstyled scaffolding and it is
-where staff live all day.
-
-### 4. Replace or substantiate the trust claims
-
-- ~~**"NABL Certified"**~~ — **removed 2026-08-17** at the product owner's
-  request. All 11 occurrences across 7 files are gone, including the two that
-  were metadata rather than visible copy (the JSON-LD in `src/lib/seo.ts` and
-  `src/app/opengraph-image.tsx`), which would otherwise have kept asserting it
-  to Google and to link previews. Replaced with "in-house laboratory". Two
-  adjacent phrasings that made the same claim without naming NABL went with it.
-
-  If the clinic *does* hold a Nepali accreditation (NPHL, NAMS), it can now be
-  named honestly — nothing is claimed in its place. To re-check, grep `\bNABL\b`
-  with the word boundaries; a plain search also matches "UNABLE" and a
-  case-insensitive one matches "u**nabl**e" / "available".
-- "15,000+ Happy Patients" and "50+ Expert Doctors" — while `/doctors` lists 9,
-  contradicting the claim on the same site.
-- A hardcoded "4.8 ★" on every lab package.
-- Three testimonials with stock names and no source.
-
-### 5. Reviews: build or remove
-
-`DoctorRating` accepts `reviews` and `canReview` props and renders a review form
-whose submit handler does nothing. Either build it (schema + endpoint) or delete
-it. With the `Doctor` table now in place, building it is much cheaper than it was.
-
-### 6. Smaller things
-
-All of these were re-verified as still open on 2026-08-17.
-
-- `<img>` tags instead of `next/image` (homepage hero, epharmacy cards, doctor
-  avatars) — no lazy-loading or CLS protection. Now **10 files**, not the 13
-  previously recorded.
-- No skip link; several pages still lack landmark regions.
-- 56 lint warnings, mostly `catch (error: any)` left over from the axios client.
-  They are warnings by choice so CI stays green; worth clearing gradually.
-- No error monitoring. Every failure path is `console.error` into the void.
-- Facebook page is named "Kist Polyclinic And Medical Center Pvt.Ltd." —
-  "Polyclinic" as one word, a fourth spelling variant. Site, logo and GBP now
-  agree on "Kist Poly Clinic".
-- GBP business description has typos: "all kinds **pf** services", lowercase
-  "kist poly clinic" and "balkumari-kharibot", "Xray"/"Ecg" → "X-ray"/"ECG".
-
----
-
 ## Disabled, not deleted
 
 **The prescription feature** is commented out at the product owner's request
 (2026-08-10). Nothing was lost — no patient-facing UI ever created a
 prescription. `src/app/api/prescriptions/route.ts` carries the full rationale,
-the list of every file to touch when re-enabling, and the two security fixes
-that must land first:
+the list of every file to touch when re-enabling, and the two security fixes that
+must land first:
 
 1. `prescriptionImageUrl` was accepted as any URL, so a patient could point a
    record at another patient's object key or an attacker-controlled domain that
@@ -266,27 +312,3 @@ that must land first:
 
 The `Prescription` Prisma model is deliberately left in place; dropping it would
 need a destructive migration and it costs nothing to keep.
-
----
-
-## Verification status
-
-**Re-run and confirmed passing on 2026-08-16:**
-
-| Command | Result |
-|---|---|
-| `npm run lint` | 0 errors, 55 warnings |
-| `npm run typecheck` | clean |
-| `npm run test` | 75 passing, 5 files |
-| `npm run build` | exit 0 |
-
-CI (`.github/workflows/ci.yml`) is configured to run all four on every push,
-plus a Playwright smoke test against a throwaway Postgres — but **it has never
-actually run**, because the work is still uncommitted and unpushed. Its first
-real run will happen when you do step 1.
-
-**Not yet verified by a human:** nobody has clicked through the new booking
-flow, the password reset, or the disabled prescription routes on a deployed
-environment. The Playwright spec covers register → book → dashboard but has
-still not been run against a real database — and cannot be until the Supabase
-project is restored. Smoke-test after applying the migrations.
