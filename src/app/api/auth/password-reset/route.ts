@@ -9,6 +9,7 @@ import {
   buildResetUrl,
   generateResetToken,
   hashResetToken,
+  resetBaseUrl,
   resetTokenExpiry,
 } from "@/lib/password-reset"
 
@@ -60,7 +61,11 @@ export async function POST(req: NextRequest) {
       select: { id: true, name: true, email: true },
     })
 
-    if (user) {
+    // Resolved before any account-dependent work so that a misconfigured
+    // deployment fails identically for every address.
+    const baseUrl = resetBaseUrl()
+
+    if (user && baseUrl) {
       const token = generateResetToken()
 
       await prisma.$transaction([
@@ -79,19 +84,23 @@ export async function POST(req: NextRequest) {
         }),
       ])
 
-      const baseUrl =
-        process.env.NEXT_PUBLIC_APP_URL ??
-        process.env.NEXTAUTH_URL ??
-        new URL(req.url).origin
-
       const { subject, html, text } = passwordResetEmail({
         name: user.name,
         resetUrl: buildResetUrl(baseUrl, token),
         ttlMinutes: Math.round(RESET_TOKEN_TTL_MS / 60000),
       })
 
-      // Failures are logged inside sendEmail and never change the response.
-      await sendEmail({ to: user.email, subject, html, text })
+      // Deliberately NOT awaited. The generic body above removes the *content*
+      // signal, but awaiting a 100-500ms round-trip to Resend reintroduces the
+      // same oracle on the clock: a known address would take an order of
+      // magnitude longer than an unknown one, which is a wider gap than the
+      // bcrypt one src/lib/password.ts exists to close. Failures are logged
+      // inside sendEmail and never reach the response either way.
+      void sendEmail({ to: user.email, subject, html, text })
+    } else if (user && !baseUrl) {
+      console.error(
+        "Password reset requested but neither NEXT_PUBLIC_APP_URL nor NEXTAUTH_URL is set; no link can be built, so no email was sent."
+      )
     }
 
     return NextResponse.json(GENERIC_RESPONSE)

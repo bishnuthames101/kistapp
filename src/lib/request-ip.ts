@@ -14,15 +14,29 @@
  * x-forwarded-for and make sure the proxy strips inbound copies of it.
  */
 
-/** In precedence order: the first header present wins. */
-const TRUSTED_HEADERS = [
-  // Vercel edge — not spoofable by the client.
-  "x-vercel-forwarded-for",
-  // Cloudflare, if it is ever put in front.
-  "cf-connecting-ip",
-  // Set by most reverse proxies to the single immediate peer.
-  "x-real-ip",
-] as const;
+/**
+ * A header is only trustworthy if a proxy that overwrites it is actually in
+ * front of this app. `cf-connecting-ip` and `x-real-ip` used to be trusted
+ * unconditionally, which was worse than not trusting them at all: nothing in
+ * front of this deployment sets either, so any client could send
+ * `cf-connecting-ip: <anything random>` and mint itself a brand-new rate-limit
+ * bucket on every single request — walking straight through the login,
+ * registration and password-reset limits that the header exists to enforce.
+ *
+ * `x-vercel-forwarded-for` is the exception and stays unconditional: Vercel's
+ * edge strips any inbound copy before setting it, so it cannot be forged from
+ * outside, and it is simply absent everywhere else.
+ *
+ * Set `TRUSTED_PROXY_HEADER` to the header your proxy overwrites (for example
+ * `cf-connecting-ip` behind Cloudflare) when you put one in front. Leave it
+ * unset otherwise.
+ */
+const VERCEL_HEADER = "x-vercel-forwarded-for";
+
+function trustedHeaders(): string[] {
+  const configured = process.env.TRUSTED_PROXY_HEADER?.trim().toLowerCase();
+  return configured ? [VERCEL_HEADER, configured] : [VERCEL_HEADER];
+}
 
 /**
  * Returns a stable identifier for the caller, or "anonymous" when no header
@@ -30,16 +44,20 @@ const TRUSTED_HEADERS = [
  * direction to fail: they share one limit rather than each getting their own.
  */
 export function getClientIp(req: { headers: Headers }): string {
-  for (const header of TRUSTED_HEADERS) {
+  for (const header of trustedHeaders()) {
     const value = req.headers.get(header)?.split(",")[0]?.trim();
     if (value) return value;
   }
 
-  // Last resort. Left-most entry is the original client when a trusted proxy
-  // appends; treat it as best-effort only.
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  if (forwarded) return forwarded;
-
+  // `x-forwarded-for` is NOT consulted here. It is appended to, not overwritten,
+  // by most proxies, so its left-most entry is whatever the client put there —
+  // which made it a free bypass of every limit keyed on this value. If your
+  // proxy does overwrite it, name it in TRUSTED_PROXY_HEADER and it is used by
+  // the loop above.
+  //
+  // Bucketing everything else together under one shared limit is the safe
+  // direction to fail: worst case a handful of unidentifiable callers contend
+  // for one bucket, versus every caller getting an unlimited supply of them.
   return "anonymous";
 }
 

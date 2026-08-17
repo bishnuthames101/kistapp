@@ -1,0 +1,14 @@
+-- Stamped whenever a user's password changes.
+--
+-- Sessions are stateless JWTs with a 24-hour maxAge, so before this column a
+-- password reset did not evict anything: an attacker holding a stolen session
+-- cookie kept full access to the victim's appointments and medical records for
+-- the rest of the day, even though the victim had just done the one thing every
+-- support page tells them to do. The jwt callback compares this against the
+-- moment the session was issued and rejects anything older.
+--
+-- Deliberately nullable with no backfill. NULL means "never changed since this
+-- column existed", which is exactly true for every existing row, and it makes
+-- the comparison a no-op for them rather than logging the whole clinic out on
+-- deploy.
+ALTER TABLE "users" ADD COLUMN "password_changed_at" TIMESTAMP(3);

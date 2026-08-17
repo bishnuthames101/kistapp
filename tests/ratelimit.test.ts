@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { MemoryLimiter, getRateLimitHeaders } from "@/lib/ratelimit";
 import { getClientIp, rateLimitIdentifier } from "@/lib/request-ip";
 
@@ -83,24 +83,37 @@ describe("getClientIp", () => {
     ).toBe("9.9.9.9");
   });
 
-  it("falls back through the trusted headers in order", () => {
-    expect(getClientIp(req({ "cf-connecting-ip": "8.8.8.8" }))).toBe("8.8.8.8");
-    expect(getClientIp(req({ "x-real-ip": "7.7.7.7" }))).toBe("7.7.7.7");
+  it("ignores proxy headers no configured proxy actually sets", () => {
+    // These were once trusted unconditionally. Nothing in front of this app
+    // sets them, so a client could send any value and mint a fresh rate-limit
+    // bucket per request — the exact bypass the header is meant to prevent.
+    expect(getClientIp(req({ "cf-connecting-ip": "8.8.8.8" }))).toBe("anonymous");
+    expect(getClientIp(req({ "x-real-ip": "7.7.7.7" }))).toBe("anonymous");
   });
 
-  it("uses the left-most x-forwarded-for entry as a last resort", () => {
-    expect(getClientIp(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("1.2.3.4");
+  it("trusts the one header the deployment declares", () => {
+    vi.stubEnv("TRUSTED_PROXY_HEADER", "cf-connecting-ip");
+    expect(getClientIp(req({ "cf-connecting-ip": "8.8.8.8" }))).toBe("8.8.8.8");
+    // Declaring one header does not implicitly trust the others.
+    expect(getClientIp(req({ "x-real-ip": "7.7.7.7" }))).toBe("anonymous");
+    vi.unstubAllEnvs();
+  });
+
+  it("never trusts x-forwarded-for, which clients can prepend to", () => {
+    expect(getClientIp(req({ "x-forwarded-for": "1.2.3.4, 5.6.7.8" }))).toBe("anonymous");
   });
 
   it("buckets callers together rather than handing each its own limit", () => {
     expect(getClientIp(req({}))).toBe("anonymous");
     // An empty header must not read as a distinct identity.
-    expect(getClientIp(req({ "x-forwarded-for": "" }))).toBe("anonymous");
+    vi.stubEnv("TRUSTED_PROXY_HEADER", "cf-connecting-ip");
+    expect(getClientIp(req({ "cf-connecting-ip": "" }))).toBe("anonymous");
+    vi.unstubAllEnvs();
   });
 });
 
 describe("rateLimitIdentifier", () => {
-  const req = { headers: new Headers({ "x-real-ip": "1.1.1.1" }) };
+  const req = { headers: new Headers({ "x-vercel-forwarded-for": "1.1.1.1" }) };
 
   it("buckets authenticated callers per user, not per IP", () => {
     // Many patients share one clinic NAT; per-IP would starve them all.

@@ -66,6 +66,7 @@ export const authOptions: NextAuthOptions = {
           phone: user.phone,
           role: user.role,
           address: user.address || '',
+          passwordChangedAt: user.passwordChangedAt?.getTime() ?? 0,
         }
       }
     })
@@ -98,6 +99,7 @@ export const authOptions: NextAuthOptions = {
         token.phone = user.phone
         token.address = user.address
         token.lastActivity = Date.now()
+        token.passwordChangedAt = user.passwordChangedAt
       }
 
       // Enforced on every token read, not only on an explicit update() from
@@ -118,10 +120,20 @@ export const authOptions: NextAuthOptions = {
         if (now - lastVerified > 60 * 1000) {
           const current = await prisma.user.findUnique({
             where: { id: token.id as string },
-            select: { isActive: true, role: true },
+            select: { isActive: true, role: true, passwordChangedAt: true },
           })
 
           if (!current || !current.isActive) {
+            return null as any
+          }
+
+          // A password change invalidates every session issued before it.
+          // Without this a reset changed nothing for an attacker already
+          // holding a stolen cookie — they kept access for the rest of the
+          // JWT's 24 hours, while the victim believed they had locked them out.
+          // Bounded by the same 60s throttle as the checks above.
+          const changedAt = current.passwordChangedAt?.getTime() ?? 0
+          if (changedAt > ((token.passwordChangedAt as number) ?? 0)) {
             return null as any
           }
 

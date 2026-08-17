@@ -63,3 +63,22 @@ export function isResetTokenUsable(
 export function buildResetUrl(baseUrl: string, token: string): string {
   return `${baseUrl.replace(/\/$/, "")}/reset-password/${encodeURIComponent(token)}`
 }
+
+/**
+ * The origin reset links are built against, or null when none is configured.
+ *
+ * This deliberately does NOT fall back to the request's own origin. In a route
+ * handler `req.url` is reconstructed from the inbound `Host` /
+ * `X-Forwarded-Host` headers, which the caller controls — so that fallback let
+ * anyone request a reset for a victim's address and have the clinic mail them a
+ * genuine link pointing at the attacker's host. The victim clicks, the attacker
+ * reads the token out of their own access log and redeems it. Returning null and
+ * refusing to send is the safe failure: a reset that does not arrive is a
+ * support ticket, a reset that arrives poisoned is an account takeover.
+ */
+export function resetBaseUrl(
+  env: { NEXT_PUBLIC_APP_URL?: string; NEXTAUTH_URL?: string } = process.env
+): string | null {
+  const configured = env.NEXT_PUBLIC_APP_URL?.trim() || env.NEXTAUTH_URL?.trim()
+  return configured ? configured : null
+}

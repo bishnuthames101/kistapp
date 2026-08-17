@@ -75,6 +75,10 @@ model User {
   role      UserRole @default(patient)
   isActive  Boolean  @default(true) @map("is_active")
   isStaff   Boolean  @default(false) @map("is_staff")
+  /// Stamped whenever the password changes. Sessions issued before this moment
+  /// are rejected, so a reset actually evicts a stolen session instead of
+  /// leaving it valid for the rest of the JWT's 24-hour life.
+  passwordChangedAt DateTime? @map("password_changed_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 

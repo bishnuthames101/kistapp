@@ -71,7 +71,14 @@ export async function POST(req: NextRequest) {
     await prisma.$transaction([
       prisma.user.update({
         where: { id: record.userId },
-        data: { password: hashedPassword },
+        data: {
+          password: hashedPassword,
+          // Evicts every session issued before now. A reset is what someone
+          // does *because* they think they are compromised, so leaving the
+          // attacker's existing JWT valid for the rest of its 24 hours would
+          // defeat the whole point. Checked in the nextauth jwt callback.
+          passwordChangedAt: new Date(),
+        },
       }),
       // Single-use: mark this token spent.
       prisma.passwordResetToken.update({

@@ -133,6 +133,18 @@ export const passwordResetLimiter: LimiterPair = {
   name: "password-reset",
 }
 
+/**
+ * 30 health checks per minute. Generous enough for an uptime monitor polling
+ * every few seconds, but the endpoint runs an unauthenticated `SELECT 1`, so
+ * without any limit it is a free database-query amplifier pointed at the
+ * clinic's own Postgres.
+ */
+export const healthLimiter: LimiterPair = {
+  primary: upstash(30, "1 m", "rl:health"),
+  fallback: new MemoryLimiter(30, MINUTE),
+  name: "health",
+}
+
 /** 10 reset-token confirmations per hour, to slow token brute-forcing. */
 export const passwordResetConfirmLimiter: LimiterPair = {
   primary: upstash(10, "1 h", "rl:pwreset-confirm"),

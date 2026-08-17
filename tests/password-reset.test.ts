@@ -5,6 +5,7 @@ import {
   generateResetToken,
   hashResetToken,
   isResetTokenUsable,
+  resetBaseUrl,
   resetTokenExpiry,
   safeEqualHex,
 } from "@/lib/password-reset";
@@ -122,5 +123,29 @@ describe("password hashing policy", () => {
     // A mismatched cost would reintroduce exactly the timing difference the
     // dummy hash exists to hide.
     expect(bcryptCost(DUMMY_PASSWORD_HASH)).toBe(BCRYPT_COST);
+  });
+});
+
+describe("resetBaseUrl", () => {
+  it("prefers the public app URL, then NEXTAUTH_URL", () => {
+    expect(
+      resetBaseUrl({
+        NEXT_PUBLIC_APP_URL: "https://clinic.example",
+        NEXTAUTH_URL: "https://other.example",
+      })
+    ).toBe("https://clinic.example");
+
+    expect(resetBaseUrl({ NEXTAUTH_URL: "https://other.example" })).toBe(
+      "https://other.example"
+    );
+  });
+
+  it("returns null rather than inventing an origin", () => {
+    // This is the whole point. The caller must refuse to send instead of
+    // falling back to the request's own Host header, which the requester
+    // controls — that fallback let an attacker have a genuine reset link
+    // mailed to a victim pointing at the attacker's own server.
+    expect(resetBaseUrl({})).toBeNull();
+    expect(resetBaseUrl({ NEXT_PUBLIC_APP_URL: "   " })).toBeNull();
   });
 });
