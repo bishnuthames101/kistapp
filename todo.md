@@ -209,28 +209,17 @@ where staff live all day.
 
 ### 4. Replace or substantiate the trust claims
 
-- **"NABL Certified"** — NABL is an *Indian* accreditation body. For a Nepali
-  clinic this is very likely wrong, and it is the kind of claim a regulator or a
-  competitor will check. Re-counted 2026-08-16: **11 occurrences across 7
-  files** (the earlier "8 places" was an undercount).
+- ~~**"NABL Certified"**~~ — **removed 2026-08-17** at the product owner's
+  request. All 11 occurrences across 7 files are gone, including the two that
+  were metadata rather than visible copy (the JSON-LD in `src/lib/seo.ts` and
+  `src/app/opengraph-image.tsx`), which would otherwise have kept asserting it
+  to Google and to link previews. Replaced with "in-house laboratory". Two
+  adjacent phrasings that made the same claim without naming NABL went with it.
 
-  | File | Lines |
-  |---|---|
-  | `src/app/page.tsx` | 117, 147, 353, 355 |
-  | `src/app/lab-tests/page.tsx` | 11, 57 |
-  | `src/app/lab-tests/package/[id]/page.tsx` | 149 |
-  | `src/app/lab-tests/packages/layout.tsx` | 7 |
-  | `src/app/about/page.tsx` | 8 |
-  | `src/app/opengraph-image.tsx` | 58 |
-  | `src/lib/seo.ts` | 17 (JSON-LD) |
-
-  Note two of these are *metadata*, not visible copy — `opengraph-image.tsx` and
-  the JSON-LD in `seo.ts` — so they will keep asserting it to Google and to link
-  previews even after the visible text is changed. Grep with `\bNABL\b`; a plain
-  `NABL` search also matches "UNABLE" and a case-insensitive one matches
-  "u**nabl**e" / "available".
-
-  If the clinic holds a Nepali accreditation (NPHL, NAMS) name that instead.
+  If the clinic *does* hold a Nepali accreditation (NPHL, NAMS), it can now be
+  named honestly — nothing is claimed in its place. To re-check, grep `\bNABL\b`
+  with the word boundaries; a plain search also matches "UNABLE" and a
+  case-insensitive one matches "u**nabl**e" / "available".
 - "15,000+ Happy Patients" and "50+ Expert Doctors" — while `/doctors` lists 9,
   contradicting the claim on the same site.
 - A hardcoded "4.8 ★" on every lab package.
