@@ -1,85 +1,85 @@
 # Kist Poly Clinic — what's next
 
-Status as of **2026-08-16** (re-checked; previous status was 2026-08-10).
+Status as of **2026-08-17** (re-checked; previous status was 2026-08-16).
 Everything previously listed as done has been removed from this file; `git log`
 is the record of it.
 
-The code is in good shape — `npm run lint` (0 errors, 55 warnings),
-`npm run typecheck`, `npm run test` (75 passing) and `npm run build` were all
-re-run on 2026-08-16 and all pass.
+The code is in good shape — `npm run lint` (0 errors, 56 warnings),
+`npm run typecheck`, `npm run test` (78 passing) and `npm run build` were all
+re-run on 2026-08-17 and all pass.
 
-**The problem is not the code, it is everything downstream of it.** Nothing from
-the 2026-08-10 session has shipped. Work through
-[Do these first](#do-these-first-2026-08-16) before starting any new feature.
+**The problem is not the code, it is everything downstream of it.** Work through
+[Do these first](#do-these-first-2026-08-17) before starting any new feature.
 
 The headline *feature* item is still SMS + email confirmation, but it is blocked
-on step 2 below (it needs a live database).
+on step 1 below (it needs a live database).
 
 ---
 
-## 🚨 Do these first (2026-08-16)
+## ✅ Done on 2026-08-17
 
-In this order. Steps 2 and 3 need your credentials or a dashboard login; nobody
-can do them from the dev machine.
+- **Everything is committed and pushed.** The 2026-08-10 backlog went up as one
+  commit, followed by the security fixes and the cart/proxy work. `git log` is
+  now the record. CI will have run for the first time — check the Actions tab.
+- **Four security findings fixed**, all in code that had not shipped yet: the
+  password-reset link no longer derives its host from the request (it was a
+  reset-poisoning account takeover); the reset email is no longer awaited (the
+  timing gap re-created the account-enumeration oracle the generic response
+  removes); a completed reset now invalidates existing sessions via
+  `users.password_changed_at`; and `cf-connecting-ip` / `x-real-ip` /
+  `x-forwarded-for` are no longer trusted blindly, which was a free rate-limit
+  bypass on login, registration and password reset. Set `TRUSTED_PROXY_HEADER`
+  if you ever put a proxy in front.
+- `/api/health` is rate limited, the cart persists to localStorage, and
+  `src/middleware.ts` is now `src/proxy.ts`.
 
-### 1. Commit and push — nothing is backed up
+---
 
-The last commit is dated **2026-08-06**. The entire 2026-08-10 session — password
-reset, rate-limit hardening, the real appointment-slot system, 75 tests, CI — is
-sitting **uncommitted in the working tree of one Windows machine**:
+## 🚨 Do these first (2026-08-17)
 
-- 31 modified files, +2,550 / −840 lines
-- ~20 new untracked files: `src/lib/slots.ts`, `password-reset.ts`, `mailer.ts`,
-  `password.ts`, `request-ip.ts`, `doctors.ts`, `src/components/SlotPicker.tsx`,
-  `tests/`, `e2e/`, `.github/`, both migrations, `prisma/seed.ts`
+In this order. All three need your credentials or a dashboard login; nobody can
+do them from the dev machine.
 
-`origin/master` is in sync with local `master`, so **none of this exists
-anywhere else**. One stray `git checkout .` or a disk failure loses the whole
-security review and the booking rebuild.
+### 1. The Supabase database password is wrong — the project is NOT deleted
 
-Side effect: the CI pipeline in `.github/workflows/ci.yml` has never run once,
-because nothing has been pushed.
-
-This is the most urgent item and it is a five-minute fix.
-
-### 2. The Supabase project looks *deleted*, not paused
-
-This blocks everything else. The 2026-08-10 handover recorded `ENOTFOUND` and
-guessed the project was paused. Probed properly on 2026-08-16, it is worse:
+This blocks everything else. **The previous entry here said the project looked
+deleted. That was wrong**, and this is the corrected finding. Re-probed on
+2026-08-17:
 
 ```
-DATABASE_URL  → XX000: tenant/user postgres.qjdjvigcqgypzagoczcn not found
+DATABASE_URL  → 28P01: password authentication failed for user "postgres"
 DIRECT_URL    → ENOTFOUND db.qjdjvigcqgypzagoczcn.supabase.co
 ```
 
-This is **not** a firewall or a local network problem — TCP to the pooler on
-port 5432 succeeds and the pooler's DNS resolves fine. The pooler is up and
-actively reporting that tenant `qjdjvigcqgypzagoczcn` does not exist, and the
-project's own direct hostname has been removed from DNS. A merely *paused*
-Supabase project keeps its DNS record, so this reads as deleted or reclaimed.
+The earlier probe got `XX000: tenant not found`; it now gets past tenant lookup
+and fails on the *password*. The pooler resolving tenant
+`qjdjvigcqgypzagoczcn` means the project exists. The `ENOTFOUND` on `DIRECT_URL`
+is expected since Supabase deprecated the IPv4 direct host and is not evidence
+of deletion.
 
-**Check the Supabase dashboard** for whether the project was deleted or the free
-tier reclaimed it. If it is unrecoverable you need a new project and a fresh
-`DATABASE_URL` / `DIRECT_URL` — in which case the migrations apply cleanly from
-scratch, which is not a bad outcome.
-
-Until this is resolved: the two migrations cannot be applied, `db:seed` cannot
-run, and none of the booking work can be smoke-tested. See
+**So the fix is small:** Supabase dashboard → Settings → Database → reset the
+database password, then update `DATABASE_URL` (and `DIRECT_URL`) in `.env` *and*
+in the Vercel project settings. Then run the migrations — see
 [Deploy steps](#deploy-steps).
 
-### 3. `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are still absent from `.env`
+### 2. `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are still absent from `.env`
 
-Confirmed missing on 2026-08-16. Password reset therefore writes the email to the
-server log instead of sending it, so **no patient can actually reset a
+Re-confirmed missing on 2026-08-17. Password reset therefore writes the email to
+the server log instead of sending it, so **no patient can actually reset a
 password**. Set them in the Vercel project settings, not just `.env`. Details in
 [Deploy steps](#deploy-steps).
 
-### 4. Smoke-test on a deployed environment
+Note the reset route now *refuses to send at all* if neither
+`NEXT_PUBLIC_APP_URL` nor `NEXTAUTH_URL` is set, and logs why. Both are present
+today; keep them set in Vercel.
+
+### 3. Smoke-test on a deployed environment
 
 Nobody has ever clicked through the booking flow or the password reset. The
-six-item checklist is in `handover.md` §4. Do it once step 2 is resolved.
+six-item checklist is in `handover.md` §4. Do it once step 1 is resolved. Add one
+item: after resetting a password, confirm the old session is logged out.
 
-### 5. Only then start SMS + email confirmation
+### 4. Only then start SMS + email confirmation
 
 It needs a live database and a provider decision from you (Sparrow SMS vs
 AakashSMS vs Twilio). See the plan below.
@@ -140,12 +140,15 @@ Sending a booking email is a small addition to it. SMS needs a provider.
 
 ## Deploy steps
 
-> **Blocked as of 2026-08-16** — the Supabase project is unreachable and appears
-> to have been deleted. Neither command below can run until that is resolved.
-> See [Do these first, step 2](#2-the-supabase-project-looks-deleted-not-paused).
+> **Blocked as of 2026-08-17** — the database password in `DATABASE_URL` is
+> wrong, so neither command below can run. Reset it in the Supabase dashboard
+> first; see
+> [Do these first, step 1](#1-the-supabase-database-password-is-wrong--the-project-is-not-deleted).
 
-Two migrations are written but **not applied** — `DATABASE_URL` points at
-production Supabase, so nothing was run against it automatically.
+Three migrations are written but **not applied** — `DATABASE_URL` points at
+production Supabase, so nothing was run against it automatically. The third,
+`20260817120000_user_password_changed_at`, is what makes a password reset log
+existing sessions out.
 
 ```bash
 npm run db:migrate   # prisma migrate deploy
@@ -241,22 +244,15 @@ it. With the `Doctor` table now in place, building it is much cheaper than it wa
 
 ### 6. Smaller things
 
-All of these were re-verified as still open on 2026-08-16.
+All of these were re-verified as still open on 2026-08-17.
 
-- The cart is memory-only: refresh or navigate away and it empties. Persist to
-  localStorage. The file is `src/contexts/CartContext.tsx` — note the plural
-  `contexts/`, there is no `src/context/` directory.
 - `<img>` tags instead of `next/image` (homepage hero, epharmacy cards, doctor
   avatars) — no lazy-loading or CLS protection. Now **10 files**, not the 13
   previously recorded.
 - No skip link; several pages still lack landmark regions.
-- `src/middleware.ts` should be renamed to `src/proxy.ts` (Next 16 deprecation).
-  Still not done — the build output already labels it `ƒ Proxy (Middleware)`.
-- 55 lint warnings, mostly `catch (error: any)` left over from the axios client.
+- 56 lint warnings, mostly `catch (error: any)` left over from the axios client.
   They are warnings by choice so CI stays green; worth clearing gradually.
 - No error monitoring. Every failure path is `console.error` into the void.
-- `/api/health` runs `SELECT 1` and is exempt from rate limiting — a free
-  unauthenticated database-query amplifier. Low severity, easy fix.
 - Facebook page is named "Kist Polyclinic And Medical Center Pvt.Ltd." —
   "Polyclinic" as one word, a fourth spelling variant. Site, logo and GBP now
   agree on "Kist Poly Clinic".
