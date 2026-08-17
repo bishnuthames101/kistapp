@@ -4,7 +4,7 @@ import JsonLd from "@/components/JsonLd";
 export const metadata = pageMetadata({
   title: "Online Pharmacy - Order Medicines Online",
   description:
-    "Order genuine medicines online from Kist Poly Clinic's e-pharmacy in Lalitpur. Browse by category, upload your prescription and get doorstep delivery across the Kathmandu Valley.",
+    "Order genuine medicines online from Kist Poly Clinic's e-pharmacy in Lalitpur. Browse by category and get doorstep delivery across the Kathmandu Valley.",
   path: "/epharmacy",
   keywords: [
     "online pharmacy Nepal",

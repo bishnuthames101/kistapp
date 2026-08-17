@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Phone, Lock } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,18 +12,17 @@ export default function LoginForm() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [timeoutMessage, setTimeoutMessage] = useState('');
   const { login } = useAuth();
   const router = useRouter();
   const { data: session, update } = useSession();
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    // Check if user was redirected due to timeout
-    if (searchParams.get('timeout') === 'true') {
-      setTimeoutMessage('Your session has expired due to inactivity. Please login again.');
-    }
-  }, [searchParams]);
+  // Derived during render, not set from an effect. This is a pure function of
+  // the URL, so an effect only bought an extra cascading render.
+  const timeoutMessage =
+    searchParams.get('timeout') === 'true'
+      ? 'Your session has expired due to inactivity. Please login again.'
+      : '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,7 +157,7 @@ export default function LoginForm() {
 
         <div className="text-center">
           <p className="text-sm text-gray-600">
-            Don't have an account?{' '}
+            Don&apos;t have an account?{' '}
             <Link href="/register" className="font-medium text-blue-600 hover:text-blue-500">
               Sign up
             </Link>

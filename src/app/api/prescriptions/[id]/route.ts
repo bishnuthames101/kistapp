@@ -1,3 +1,29 @@
+/**
+ * PRESCRIPTION FEATURE — DISABLED (not deleted).
+ * See src/app/api/prescriptions/route.ts for the full rationale and the
+ * security fixes required before re-enabling.
+ */
+
+import { NextResponse } from "next/server"
+
+const DISABLED = NextResponse.json({ error: "Not found" }, { status: 404 })
+
+export async function GET() {
+  return DISABLED
+}
+
+export async function PATCH() {
+  return DISABLED
+}
+
+export async function DELETE() {
+  return DISABLED
+}
+
+/* ===========================================================================
+ * ORIGINAL IMPLEMENTATION — uncomment to restore
+ * ===========================================================================
+
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requireAuth, requireAdmin } from "@/lib/auth"
@@ -168,3 +194,5 @@ export async function DELETE(
     )
   }
 }
+
+ * =========================================================================== */

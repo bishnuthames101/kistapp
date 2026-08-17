@@ -9,6 +9,7 @@ import { useToast } from '@/contexts/ToastContext';
 import { doctors } from '@/data/doctors';
 import { appointments, errorMessage } from '@/services/api';
 import Modal from '@/components/Modal';
+import SlotPicker, { type SlotSelection } from '@/components/SlotPicker';
 
 
 
@@ -22,6 +23,9 @@ export default function DoctorProfile() {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedTime, setSelectedTime] = useState('');
+  // On-call doctors have no slot to pick, so "no time chosen" is valid for them
+  // but not for a scheduled doctor.
+  const [bookingMode, setBookingMode] = useState<SlotSelection['bookingMode'] | null>(null);
   const [booking, setBooking] = useState(false);
 
   const tomorrow = new Date();
@@ -32,11 +36,10 @@ export default function DoctorProfile() {
   maxDate.setDate(maxDate.getDate() + 30);
   const maxDateStr = maxDate.toISOString().split('T')[0];
 
-  const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00'
-  ];
+  const handleSlotChange = (selection: SlotSelection) => {
+    setSelectedTime(selection.time);
+    setBookingMode(selection.bookingMode);
+  };
 
   const handleBooking = () => {
     if (!user) {
@@ -47,8 +50,16 @@ export default function DoctorProfile() {
   };
 
   const handleConfirmBooking = () => {
-    if (!selectedDate || !selectedTime) {
-      showToast('Please select date and time', 'error');
+    if (!selectedDate) {
+      showToast('Please select a date', 'error');
+      return;
+    }
+    if (bookingMode === 'scheduled' && !selectedTime) {
+      showToast('Please choose an appointment time', 'error');
+      return;
+    }
+    if (!bookingMode) {
+      showToast('Still loading availability. Please wait a moment.', 'error');
       return;
     }
     setShowConfirmation(true);
@@ -62,21 +73,30 @@ export default function DoctorProfile() {
     // booking from a doctor profile created nothing.
     setBooking(true);
     try {
+      // The server reads the name, specialty and fee from the doctor record.
       await appointments.create({
-        doctorName: doctor.name,
-        doctorSpecialization: doctor.specialty,
+        doctorId: String(doctor.id),
         appointmentDate: selectedDate,
-        appointmentTime: selectedTime,
+        appointmentTime: selectedTime || undefined,
         reason: `Consultation with ${doctor.name}`,
       });
 
-      showToast('Appointment booked successfully! You can see it in your dashboard.', 'success');
+      showToast(
+        bookingMode === 'on_call'
+          ? 'Request sent. The clinic will call you to confirm a time.'
+          : 'Appointment booked successfully! You can see it in your dashboard.',
+        'success'
+      );
       setShowBooking(false);
       setShowConfirmation(false);
       setSelectedDate('');
       setSelectedTime('');
+      setBookingMode(null);
     } catch (error) {
       console.error('Failed to book appointment:', error);
+      // A 409 means the slot went while the patient was confirming — send them
+      // back to pick again rather than leaving a dead confirmation screen.
+      setShowConfirmation(false);
       showToast(errorMessage(error, 'Failed to book appointment'), 'error');
     } finally {
       setBooking(false);
@@ -154,7 +174,11 @@ export default function DoctorProfile() {
                 min={minDate}
                 max={maxDateStr}
                 value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
+                onChange={(e) => {
+                  setSelectedDate(e.target.value);
+                  setSelectedTime('');
+                  setBookingMode(null);
+                }}
                 className="w-full p-2 border border-gray-300 rounded-md"
               />
             </div>
@@ -163,18 +187,12 @@ export default function DoctorProfile() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Select Time
               </label>
-              <select
+              <SlotPicker
+                doctorId={String(doctor.id)}
+                date={selectedDate}
                 value={selectedTime}
-                onChange={(e) => setSelectedTime(e.target.value)}
-                className="w-full p-2 border border-gray-300 rounded-md"
-              >
-                <option value="">Choose a time slot</option>
-                {timeSlots.map((slot) => (
-                  <option key={slot} value={slot}>
-                    {slot}
-                  </option>
-                ))}
-              </select>
+                onChange={handleSlotChange}
+              />
             </div>
 
             <div className="flex justify-end space-x-3">
@@ -213,10 +231,17 @@ export default function DoctorProfile() {
           <p className="font-medium">{doctor.specialty}</p>
         </div>
         <div>
-          <p className="text-sm text-gray-600">Date & Time</p>
+          <p className="text-sm text-gray-600">Date &amp; Time</p>
           <p className="font-medium">
-            {new Date(selectedDate).toLocaleDateString()} at {selectedTime}
+            {new Date(selectedDate).toLocaleDateString()}
+            {selectedTime ? ` at ${selectedTime}` : ''}
           </p>
+          {bookingMode === 'on_call' && (
+            <p className="text-sm text-blue-700 mt-1">
+              This doctor sees patients on call — the clinic will call you to
+              confirm an exact time.
+            </p>
+          )}
         </div>
         <div>
           <p className="text-sm text-gray-600">Consultation Fee</p>
@@ -241,7 +266,11 @@ export default function DoctorProfile() {
           className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 flex items-center disabled:opacity-60"
         >
           <Check className="w-4 h-4 mr-2" />
-          {booking ? 'Booking…' : 'Confirm Booking'}
+          {booking
+            ? 'Booking…'
+            : bookingMode === 'on_call'
+              ? 'Send Request'
+              : 'Confirm Booking'}
         </button>
       </div>
   </>

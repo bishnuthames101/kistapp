@@ -72,7 +72,7 @@ export default function PharmacyOrdersSection() {
         <Pill className="w-12 h-12 mx-auto text-blue-500 mb-4" />
         <h3 className="text-xl font-semibold mb-2">No Pharmacy Orders Yet</h3>
         <p className="text-gray-600 mb-4">
-          You haven't purchased any pharmacy products yet.
+          You haven&apos;t purchased any pharmacy products yet.
         </p>
         <Link
           href="/epharmacy"

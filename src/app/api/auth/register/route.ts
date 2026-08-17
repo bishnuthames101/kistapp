@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import { hashPassword } from "@/lib/password"
 import { z } from "zod"
-import { authLimiter, getRateLimitHeaders } from "@/lib/ratelimit"
+import { authLimiter, checkLimit, tooManyRequests } from "@/lib/ratelimit"
+import { getClientIp } from "@/lib/request-ip"
 
 const registerSchema = z.object({
   phone: z.string().length(10).regex(/^9/, "Phone must start with 9"),
@@ -14,12 +15,11 @@ const registerSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anonymous"
-    const { success, limit, reset, remaining } = await authLimiter.limit(ip)
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many registration attempts. Please try again later." },
-        { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
+    const limitResult = await checkLimit(authLimiter, getClientIp(req))
+    if (!limitResult.success) {
+      return tooManyRequests(
+        limitResult,
+        "Too many registration attempts. Please try again later."
       )
     }
 
@@ -39,14 +39,32 @@ export async function POST(req: NextRequest) {
     })
 
     if (existing) {
+      // Deliberate trade-off, documented so it is not "fixed" by accident.
+      //
+      // This response does disclose that *some* account uses one of these two
+      // identifiers, which is a mild enumeration signal. It is kept because:
+      //   - phone is the login identifier and is UNIQUE, so a truthful
+      //     "created" response is impossible; something has to be said;
+      //   - staying silent, or claiming success, strands a real patient who
+      //     simply forgot they had signed up — the most common case by far;
+      //   - it does NOT say which of the two matched, so an attacker cannot
+      //     confirm a specific email against a specific phone;
+      //   - registration is rate limited to 5 attempts per 15 minutes.
+      //
+      // The enumeration paths that actually mattered are closed: login now
+      // burns equal time on unknown accounts (see src/lib/password.ts), and
+      // /api/auth/password-reset always returns the same generic body.
       return NextResponse.json(
-        { error: "User with this phone or email already exists" },
+        {
+          error:
+            "An account with this phone number or email already exists. Try logging in, or reset your password.",
+        },
         { status: 400 }
       )
     }
 
     // Hash password
-    const hashedPassword = await bcrypt.hash(validated.password, 10)
+    const hashedPassword = await hashPassword(validated.password)
 
     // Create user
     const user = await prisma.user.create({

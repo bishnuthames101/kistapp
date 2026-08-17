@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { apiLimiter, getRateLimitHeaders } from '@/lib/ratelimit';
+import { apiLimiter, checkLimit, getRateLimitHeaders } from '@/lib/ratelimit';
+import { rateLimitIdentifier } from '@/lib/request-ip';
 
 // Routes that run their own, stricter limiter and must not be double-counted,
 // plus the health probe which uptime monitors poll frequently.
@@ -23,23 +24,21 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/api') &&
     !RATE_LIMIT_EXEMPT.some((prefix) => pathname.startsWith(prefix))
   ) {
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'anonymous';
-    const identifier = token?.id ? `user:${token.id}` : `ip:${ip}`;
+    const identifier = rateLimitIdentifier(request, token?.id as string | undefined);
 
-    // Fail open: this limiter now gates the entire API surface, so an Upstash
-    // outage or a missing credential must not take booking and ordering down
-    // with it. A dropped limit is far cheaper than a dead clinic API.
-    try {
-      const { success, limit, reset, remaining } = await apiLimiter.limit(identifier);
-      if (!success) {
-        return NextResponse.json(
-          { error: 'Too many requests. Please slow down.' },
-          { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
-        );
-      }
-    } catch (err) {
-      console.error('Rate limiter unavailable, allowing request through:', err);
+    // `checkLimit` never throws: if Upstash is unreachable it falls back to a
+    // per-instance in-memory counter rather than taking booking and ordering
+    // down with it. See src/lib/ratelimit.ts.
+    const { success, limit, reset, remaining } = await checkLimit(
+      apiLimiter,
+      identifier
+    );
+
+    if (!success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please slow down.' },
+        { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
+      );
     }
   }
 

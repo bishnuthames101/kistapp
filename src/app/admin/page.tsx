@@ -74,7 +74,7 @@ export default function AdminDashboard() {
       {/* Quick Stats */}
       <div className="mt-12">
         <h2 className="text-2xl font-bold mb-6">Quick Stats</h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <p className="text-gray-600 text-sm">Total Medicines</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">-</p>
@@ -83,10 +83,13 @@ export default function AdminDashboard() {
             <p className="text-gray-600 text-sm">Pending Orders</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">-</p>
           </div>
+          {/* PRESCRIPTION FEATURE — DISABLED (not deleted). See
+              src/app/api/prescriptions/route.ts before re-enabling.
           <div className="bg-white p-6 rounded-lg shadow border border-gray-200">
             <p className="text-gray-600 text-sm">Pending Prescriptions</p>
             <p className="text-3xl font-bold text-gray-900 mt-2">-</p>
           </div>
+          */}
         </div>
       </div>
     </div>

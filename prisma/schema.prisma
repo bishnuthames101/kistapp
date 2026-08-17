@@ -53,6 +53,17 @@ enum StockStatus {
   OUT_OF_STOCK
 }
 
+/// How a patient books a given doctor.
+///
+/// `scheduled` doctors have real weekly hours and the patient picks an exact
+/// time. `on_call` doctors have no fixed clinic hours, so the patient submits a
+/// preferred date and the clinic confirms an actual time — offering them a
+/// timetable would be inventing one.
+enum DoctorBookingMode {
+  scheduled
+  on_call
+}
+
 // Models
 model User {
   id        String   @id @default(cuid())
@@ -68,11 +79,12 @@ model User {
   updatedAt DateTime @updatedAt @map("updated_at")
 
   // Relations
-  appointments    Appointment[]
-  laboratoryTests LaboratoryTest[]
-  pharmacyOrders  PharmacyOrder[]
-  medicalRecords  MedicalRecord[]
-  prescriptions   Prescription[]
+  appointments        Appointment[]
+  laboratoryTests     LaboratoryTest[]
+  pharmacyOrders      PharmacyOrder[]
+  medicalRecords      MedicalRecord[]
+  prescriptions       Prescription[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([phone, isActive])
   @@index([createdAt])
@@ -98,24 +110,103 @@ model Medicine {
   @@map("medicines")
 }
 
-model Appointment {
-  id                   String            @id @default(cuid())
-  patientId            String            @map("patient_id")
-  doctorName           String            @map("doctor_name")
-  doctorSpecialization String            @map("doctor_specialization")
-  appointmentDate      DateTime          @map("appointment_date") @db.Date
-  appointmentTime      String            @map("appointment_time")
-  status               AppointmentStatus @default(pending)
-  reason               String?
-  notes                String?
-  createdAt            DateTime          @default(now()) @map("created_at")
-  updatedAt            DateTime          @updatedAt @map("updated_at")
+/// A doctor who can be booked.
+///
+/// Doctors previously existed only in `src/data/doctors.ts`, and Appointment
+/// stored `doctorName` as free text — so renaming a doctor silently detached
+/// every historical appointment, and nothing could enforce availability.
+///
+/// That file is still the content source for the marketing pages (it drives
+/// static generation); `prisma/seed.ts` mirrors it into this table, which is
+/// the authority for booking. `legacyId` keeps the existing /doctors/[id] URLs
+/// working.
+model Doctor {
+  id                  String            @id @default(cuid())
+  slug                String            @unique
+  legacyId            Int?              @unique @map("legacy_id")
+  name                String
+  specialty           String
+  education           String
+  experience          String
+  image               String?
+  /// The human sentence shown on the doctor card ("Sun-Wed: 10AM - 5PM").
+  scheduleNote        String            @map("schedule_note")
+  opdCharge           Decimal           @map("opd_charge") @db.Decimal(10, 2)
+  nmcNumber           String            @map("nmc_number")
+  bookingMode         DoctorBookingMode @default(on_call) @map("booking_mode")
+  slotDurationMinutes Int               @default(30) @map("slot_duration_minutes")
+  isActive            Boolean           @default(true) @map("is_active")
+  createdAt           DateTime          @default(now()) @map("created_at")
+  updatedAt           DateTime          @updatedAt @map("updated_at")
 
   // Relations
-  patient User @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  schedules    DoctorSchedule[]
+  appointments Appointment[]
 
+  @@index([isActive])
+  @@map("doctors")
+}
+
+/// One recurring weekly working window for a doctor.
+///
+/// Times are stored as minutes from midnight rather than strings so that
+/// ordering and overlap checks are plain integer comparisons.
+model DoctorSchedule {
+  id          String @id @default(cuid())
+  doctorId    String @map("doctor_id")
+  /// 0 = Sunday ... 6 = Saturday, matching JavaScript's `Date.getDay()`.
+  dayOfWeek   Int    @map("day_of_week")
+  startMinute Int    @map("start_minute")
+  /// Exclusive: a 10:00-17:00 window with 30-minute slots ends at 16:30.
+  endMinute   Int    @map("end_minute")
+
+  // Relations
+  doctor Doctor @relation(fields: [doctorId], references: [id], onDelete: Cascade)
+
+  @@unique([doctorId, dayOfWeek, startMinute])
+  @@index([doctorId, dayOfWeek])
+  @@map("doctor_schedules")
+}
+
+model Appointment {
+  id        String @id @default(cuid())
+  patientId String @map("patient_id")
+
+  /// Nullable so appointments booked before the Doctor table existed survive
+  /// the migration. New bookings always set it.
+  doctorId String? @map("doctor_id")
+
+  /// Snapshots, deliberately kept alongside `doctorId`. An appointment is a
+  /// historical record: it should still read correctly if the doctor is later
+  /// renamed, changes specialty, or leaves the clinic.
+  doctorName           String   @map("doctor_name")
+  doctorSpecialization String   @map("doctor_specialization")
+  /// The consultation fee agreed at booking time. Previously shown at
+  /// confirmation and then thrown away, so appointments carried no price.
+  opdCharge            Decimal? @map("opd_charge") @db.Decimal(10, 2)
+
+  appointmentDate DateTime          @map("appointment_date") @db.Date
+  /// 24-hour "HH:MM". Empty for on-call requests, where the clinic sets the
+  /// time when it confirms.
+  appointmentTime String            @map("appointment_time")
+  status          AppointmentStatus @default(pending)
+  reason          String?
+  notes           String?
+  createdAt       DateTime          @default(now()) @map("created_at")
+  updatedAt       DateTime          @updatedAt @map("updated_at")
+
+  // Relations
+  patient User    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  doctor  Doctor? @relation(fields: [doctorId], references: [id], onDelete: Restrict)
+
+  // NOTE: uniqueness on (doctorId, appointmentDate, appointmentTime) is enforced
+  // by a PARTIAL unique index that only covers live appointments, so a
+  // cancelled 10:00 slot can be rebooked. Prisma cannot express a partial index,
+  // so it is created as raw SQL in the migration and is invisible here. See
+  // prisma/migrations/20260810130000_doctors_and_slots/migration.sql.
   @@index([patientId, appointmentDate])
   @@index([status])
+  @@index([doctorId, appointmentDate])
   @@map("appointments")
 }
 
@@ -179,6 +270,27 @@ model MedicalRecord {
   @@index([patientId])
   @@index([createdAt])
   @@map("medical_records")
+}
+
+/// Single-use, short-lived password reset tokens.
+///
+/// Only the SHA-256 hash of the token is stored: a leaked database dump must
+/// not hand the attacker a working reset link for every pending request. The
+/// raw token exists only in the emailed URL.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  /// Set the moment the token is redeemed, making replay impossible.
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Prescription {

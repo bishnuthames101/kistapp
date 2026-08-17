@@ -1,146 +1,182 @@
-# Kist Poly Clinic — findings and remaining work
+# Kist Poly Clinic — what's next
 
-Status as of 2026-08-06.
+Status as of **2026-08-16** (re-checked; previous status was 2026-08-10).
+Everything previously listed as done has been removed from this file; `git log`
+is the record of it.
 
-**Done:** items 1–7 (the "this week" batch). Shipped in commits `526d166` and
-`618e5dc`, on top of `16ffbc7` (security + SEO + branding), `b4db0b0`
-(name/address), `80e5c56` (landmark + map), `a0d3509` (social profiles).
+The code is in good shape — `npm run lint` (0 errors, 55 warnings),
+`npm run typecheck`, `npm run test` (75 passing) and `npm run build` were all
+re-run on 2026-08-16 and all pass.
 
-**Left:** items 8–15. Item 11's prescription-bucket audit is the only one that
-is a live data-exposure risk rather than a quality problem — do that one first.
+**The problem is not the code, it is everything downstream of it.** Nothing from
+the 2026-08-10 session has shipped. Work through
+[Do these first](#do-these-first-2026-08-16) before starting any new feature.
 
-**Not yet verified by a human:** nobody has clicked through the fixed flows on
-the live site. Typecheck and build pass, but there is still no test suite
-(item 12). Smoke-test before building on top of this.
-
----
-
-## The original diagnosis (still accurate, kept for context)
-
-The app felt vague because it was structurally incoherent. Three applications
-were layered on top of each other and none was finished:
-
-1. A static marketing site (services, doctors, lab packages — hardcoded in `src/data/*.ts`)
-2. A half-migrated Django client (`src/services/api.ts`, snake_case, localStorage JWTs)
-3. A new Next.js/Prisma backend (camelCase, cookie sessions, paginated envelopes)
-
-Nobody reconciled the seams. Items 1–7 reconciled them. Items 8–15 are about
-the domain model and the product, not the seams.
+The headline *feature* item is still SMS + email confirmation, but it is blocked
+on step 2 below (it needs a live database).
 
 ---
 
-## DONE
+## 🚨 Do these first (2026-08-16)
 
-### ✅ 1. One shared response contract (was P0 #1 and #2)
+In this order. Steps 2 and 3 need your credentials or a dashboard login; nobody
+can do them from the dev machine.
 
-Every list route returned `{data,total,page,totalPages}` while every consumer
-treated the body as a bare array. The patient dashboard showed "Failed to load"
-on three of four tabs; the admin appointments, lab-test, order and medicine
-pages threw during render. The lab-test route also hand-converted rows to
-snake_case, so the admin page and the dashboard disagreed on field names.
+### 1. Commit and push — nothing is backed up
 
-- All collection endpoints now return the same envelope (`src/lib/serialize.ts`).
-  Prescriptions gained the envelope and pagination.
-- Dropped the snake_case transform from `/api/laboratory-tests`.
-- Prisma `Decimal` → number and `@db.Date` → `"YYYY-MM-DD"` at the edge, which
-  deleted a lot of `typeof x === 'string' ? parseFloat(x) : x`.
-- New `src/lib/api-client.ts`. `getList` unwraps the envelope and throws a named
-  `ApiShapeError` when a response is not the expected shape — the guard that
-  would have caught this the day it was introduced.
-- Rewrote `src/services/api.ts` with types that match what the server sends.
-  Removed the dead Django endpoints, the localStorage bearer token, and the 401
-  interceptor that hard-redirected and wiped the cart.
-- Fixed the dashboard, `PharmacyOrdersSection`, and all four admin pages.
+The last commit is dated **2026-08-06**. The entire 2026-08-10 session — password
+reset, rate-limit hardening, the real appointment-slot system, 75 tests, CI — is
+sitting **uncommitted in the working tree of one Windows machine**:
 
-### ✅ 2. Pharmacy checkout (was P0 #3)
+- 31 modified files, +2,550 / −840 lines
+- ~20 new untracked files: `src/lib/slots.ts`, `password-reset.ts`, `mailer.ts`,
+  `password.ts`, `request-ip.ts`, `doctors.ts`, `src/components/SlotPicker.tsx`,
+  `tests/`, `e2e/`, `.github/`, both migrations, `prisma/seed.ts`
 
-Failed 100% of the time: the client sent snake_case Django fields, Zod stripped
-them, every order 400'd with "Medicine ID or name is required".
+`origin/master` is in sync with local `master`, so **none of this exists
+anywhere else**. One stray `git checkout .` or a disk failure loses the whole
+security review and the booking rebuild.
 
-- Sends `medicineId` + `quantity`; the server prices the order.
-- Reports partial failures ("Ordered 3 of 5 items") instead of claiming success,
-  and keeps failed items in the cart so a retry cannot double-order.
-- Unified the duplicate `Medicine` type whose `stock` values (`'In Stock'`)
-  never matched the server enum (`'IN_STOCK'`).
-- Add to Cart is disabled for out-of-stock medicines.
+Side effect: the CI pipeline in `.github/workflows/ci.yml` has never run once,
+because nothing has been pushed.
 
-### ✅ 3. Inactivity timeouts (was P0 #4)
+This is the most urgent item and it is a five-minute fix.
 
-Three mechanisms disagreed and the harshest won: a silent 90s timer in
-`AuthContext` always fired before `InactivityMonitor`'s warning, so the "Session
-about to expire" modal was unreachable.
+### 2. The Supabase project looks *deleted*, not paused
 
-- Deleted the silent timer; `InactivityMonitor` is the sole owner.
-- One policy in `src/lib/session-policy.ts`, shared with the NextAuth jwt
-  callback (which had its own hardcoded copy). **20 min patients, 15 min staff**,
-  warning 60s before. Change it there if you disagree.
-- Timeout enforced on every token read, not only on an explicit `update()`.
-- Server-side timestamp refreshes at most once every 2 minutes; it previously
-  fired a session write and a throttled DB read every 5 seconds of mouse movement.
+This blocks everything else. The 2026-08-10 handover recorded `ENOTFOUND` and
+guessed the project was paused. Probed properly on 2026-08-16, it is worse:
 
-### ✅ 4. Booking modals
+```
+DATABASE_URL  → XX000: tenant/user postgres.qjdjvigcqgypzagoczcn not found
+DIRECT_URL    → ENOTFOUND db.qjdjvigcqgypzagoczcn.supabase.co
+```
 
-All five were hand-rolled overlays with `pointer-events-none` — no scrim, no
-dimming, page still scrollable and clickable behind them.
+This is **not** a firewall or a local network problem — TCP to the pooler on
+port 5432 succeeds and the pooler's DNS resolves fine. The pooler is up and
+actively reporting that tenant `qjdjvigcqgypzagoczcn` does not exist, and the
+project's own direct hostname has been removed from DNS. A merely *paused*
+Supabase project keeps its DNS record, so this reads as deleted or reclaimed.
 
-- New `src/components/Modal.tsx`: backdrop, Escape, focus trap, scroll lock,
-  `role="dialog"`, focus restored on close. All five dialogs use it.
+**Check the Supabase dashboard** for whether the project was deleted or the free
+tier reclaimed it. If it is unrecoverable you need a new project and a fresh
+`DATABASE_URL` / `DIRECT_URL` — in which case the migrations apply cleanly from
+scratch, which is not a bad outcome.
 
-### ✅ 5. Pharmacy search box
+Until this is resolved: the two migrations cannot be applied, `db:seed` cannot
+run, and none of the booking work can be smoke-tested. See
+[Deploy steps](#deploy-steps).
 
-Was bound to state nothing ever read. Now a debounced search against
-`/api/medicines?search=`, rendering results in place of the category browse.
+### 3. `RESEND_API_KEY` / `RESEND_FROM_EMAIL` are still absent from `.env`
 
-### ✅ 6. Navigation
+Confirmed missing on 2026-08-16. Password reset therefore writes the email to the
+server log instead of sending it, so **no patient can actually reset a
+password**. Set them in the Vercel project settings, not just `.env`. Details in
+[Deploy steps](#deploy-steps).
 
-Added Doctors, About and Contact to the navbar (desktop and mobile) — they were
-reachable only from the footer. Also closed the account dropdown on outside
-click and Escape.
+### 4. Smoke-test on a deployed environment
 
-### ✅ 7. "Cash on Delivery" on consultations
+Nobody has ever clicked through the booking flow or the password reset. The
+six-item checklist is in `handover.md` §4. Do it once step 2 is resolved.
 
-Now "Pay at the clinic on the day of your visit".
+### 5. Only then start SMS + email confirmation
 
-### ✅ Bonus — found while fixing the above
-
-- **`/doctors/[id]` Book Appointment created nothing.** `handleFinalConfirmation`
-  showed "Appointment booked successfully!" and never called the API. Not a
-  payload bug — there was no request at all. Now creates the appointment.
-- Catch blocks inspecting `error.response` (an axios shape that no longer
-  exists) replaced, so failures show a real message.
-- Category pages had no cart button — items vanished into a UI you could not
-  reach from that page. Added a cart link.
+It needs a live database and a provider decision from you (Sparrow SMS vs
+AakashSMS vs Twilio). See the plan below.
 
 ---
 
-## LEFT TO DO
+## 🔜 Future plan — SMS + email confirmation
 
-### 🔴 11a. Audit the Supabase prescription bucket — DO THIS FIRST
+The clinic sends nothing to anyone. No booking confirmation, no reminder, no
+message when an appointment is confirmed or cancelled. In Nepal, for a clinic,
+the SMS *is* the reason a patient believes the booking happened — right now the
+only confirmation is a toast that disappears in three seconds.
 
-Prescription images are served via `getPublicUrl`. If the bucket is public,
-anyone holding the URL can read a patient's prescription with no
-authentication. This is a PHI exposure, not a code-quality issue, and it is
-live right now. Fix is `createSignedUrl` with a short TTL, which also touches
-the admin and dashboard read paths. **Check the bucket ACLs before anything else.**
+The plumbing already exists: `src/lib/mailer.ts` was added for password reset
+and wraps `resend` with a "log instead of send when unconfigured" fallback.
+Sending a booking email is a small addition to it. SMS needs a provider.
 
-### 8. Doctor and DoctorSlot tables
+### Scope
 
-There is no `Doctor` table. Doctors live in `src/data/doctors.ts` and
-`Appointment` stores `doctorName` as free text (`prisma/schema.prisma:99`).
+**Email (via `resend`, already wired):**
 
-- No availability, capacity or conflict detection.
-  `src/app/services/[id]/page.tsx` generates 10:00–16:00 slots for every doctor
-  on every date from a hardcoded loop. Fifty patients can book the same doctor
-  at the same time and all get "booked successfully". The doctor's real schedule
-  is displayed one card above as decorative text.
-- Rename a doctor and every historical appointment silently detaches.
-- `opdCharge` is shown at confirmation but never persisted — appointments carry
-  no price.
+- Booking confirmation — doctor, date, time, OPD charge, clinic address.
+  For on-call doctors, say plainly that the clinic will call to fix a time.
+- Status change — when staff move an appointment to confirmed or cancelled.
+- Reminder the day before.
 
-Generate slots from real schedules; enforce uniqueness on (doctor, date, time).
-Without this the booking feature is theatre.
+**SMS (needs a provider decision):**
 
-### 9. Order header with OrderItem children
+- Same three messages, much shorter. SMS is the one that matters here; email is
+  the fallback for patients who gave one.
+- Nepali providers to compare: Sparrow SMS, AakashSMS, and Twilio for
+  international. Cost per SMS and NTA registration requirements will decide it.
+- Phone numbers are already validated to 10 digits starting with 9, so the data
+  is clean enough to send to.
+
+### Things to decide before building
+
+1. **Provider and budget.** Roughly how many appointments a month? At ~NPR 1–2
+   per SMS that sets the running cost.
+2. **Who gets what.** Patient only, or the clinic desk too? A "new booking"
+   message to staff is often what actually makes online booking useful to them.
+3. **Language.** Nepali, English, or both in one message.
+4. **Opt-out.** Needed if reminders are added; not for transactional
+   confirmations.
+
+### Build notes
+
+- Send **after** the database write commits, never inside the transaction — a
+  failed SMS must not roll back a real appointment.
+- Sending must never change the API response. `sendEmail` already swallows and
+  logs failures for exactly this reason; do the same for SMS.
+- Retries and delivery status want a queue eventually. For the volume a single
+  clinic sees, fire-and-forget with logging is honest and sufficient to start.
+- Add the message templates next to `passwordResetEmail` in `src/lib/mailer.ts`
+  so the wording lives in one place.
+
+---
+
+## Deploy steps
+
+> **Blocked as of 2026-08-16** — the Supabase project is unreachable and appears
+> to have been deleted. Neither command below can run until that is resolved.
+> See [Do these first, step 2](#2-the-supabase-project-looks-deleted-not-paused).
+
+Two migrations are written but **not applied** — `DATABASE_URL` points at
+production Supabase, so nothing was run against it automatically.
+
+```bash
+npm run db:migrate   # prisma migrate deploy
+npm run db:seed      # loads the 9 doctors + their weekly schedules
+```
+
+`db:seed` is idempotent and also backfills `doctor_id` on existing appointments
+by matching the stored doctor name. Re-run it after editing
+`src/data/doctors.ts`.
+
+**Also set `RESEND_API_KEY` and `RESEND_FROM_EMAIL`** — re-confirmed still
+missing from `.env` on 2026-08-16. Without them password
+reset still works end to end, but the email is written to the server log instead
+of being delivered — so nobody can actually reset a password. The sending domain
+must be verified in Resend.
+
+---
+
+## Still outstanding
+
+### 1. Audit the Supabase storage buckets
+
+The prescription feature is switched off (see below), which removes the
+immediate exposure. But `/api/upload` still hands out `getPublicUrl()` for the
+`medical-records` bucket. If that bucket is public, anyone with the URL reads a
+patient's records with no authentication.
+
+**This is a Supabase dashboard check, not a code change.** Do it before anyone
+uploads a medical record. The fix in code is `createSignedUrl` with a short TTL.
+
+### 2. Order header with OrderItem children
 
 A 5-item cart is still 5 unrelated `PharmacyOrder` rows. No order ID, no single
 total, no shipping record. Create in one `prisma.$transaction`. The dashboard's
@@ -148,75 +184,79 @@ total, no shipping record. Create in one `prisma.$transaction`. The dashboard's
 
 Related: **stock is a boolean enum**, not a quantity
 (`StockStatus { IN_STOCK | OUT_OF_STOCK }`), with no decrement on order, so
-overselling is guaranteed.
+overselling is guaranteed. The appointment work just added a partial unique
+index to stop double-booking; pharmacy has the same class of bug and no
+equivalent guard.
 
-### 10. Confirmation email + SMS
+Delete `src/types/pharmacyOrder.ts` with this — it describes an order shape that
+does not exist (`items: CartItem[]`, `orderDate`) and will mislead.
 
-`resend` is already a dependency. Nothing notifies anyone — no booking
-confirmation, no reminder, no status-change message. In Nepal, for a clinic,
-SMS confirmation is the reason a patient trusts the booking.
-
-### 11b. Real password reset
-
-`/forgot-password` POSTs to `http://127.0.0.1:8000/api/password-reset/` — a dead
-Django endpoint — and shows "reset link has been sent" regardless. Users who
-forget a password are permanently locked out. Needs a reset-token table
-(Prisma migration) + `resend`.
-
-### 12. Tests and CI
-
-Zero tests, zero CI. A single integration test on "book → view in dashboard"
-would have caught items 1, 2 and 3 in one run.
-
-- Playwright smoke test: register → book appointment → see it in dashboard →
-  admin confirms → patient sees "confirmed".
-- Run it in GitHub Actions on every push.
-- **Linting is also broken:** `npm run lint` calls `next lint`, removed in
-  Next 16, and ESLint 9 needs a flat `eslint.config.js` while this project has
-  `.eslintrc.json`. Fix alongside CI.
-
-### 13. Commit to one visual system
+### 3. Commit to one visual system
 
 `globals.css` defines a complete glass-morphism vocabulary (20+ tokens). The
 homepage uses none of it — solid gradients and hand-rolled Tailwind.
 `/epharmacy` is fully glass. `/dashboard` is flat white cards. `/admin` is
 unstyled tables. Users cross three visual identities in four clicks. This is the
-biggest remaining driver of "feels vague."
+biggest remaining driver of "feels vague".
 
 Recommendation: delete the glass system — frosted glass over gradients is poor
 for medical text legibility and contrast. Then rebuild the dashboard and admin
 against whatever you pick. The admin panel is unstyled scaffolding and it is
 where staff live all day.
 
-### 14. Replace or substantiate the trust claims
+### 4. Replace or substantiate the trust claims
 
-- "15,000+ Happy Patients", "50+ Expert Doctors" — while `/doctors` lists 9,
+- **"NABL Certified"** — NABL is an *Indian* accreditation body. For a Nepali
+  clinic this is very likely wrong, and it is the kind of claim a regulator or a
+  competitor will check. Re-counted 2026-08-16: **11 occurrences across 7
+  files** (the earlier "8 places" was an undercount).
+
+  | File | Lines |
+  |---|---|
+  | `src/app/page.tsx` | 117, 147, 353, 355 |
+  | `src/app/lab-tests/page.tsx` | 11, 57 |
+  | `src/app/lab-tests/package/[id]/page.tsx` | 149 |
+  | `src/app/lab-tests/packages/layout.tsx` | 7 |
+  | `src/app/about/page.tsx` | 8 |
+  | `src/app/opengraph-image.tsx` | 58 |
+  | `src/lib/seo.ts` | 17 (JSON-LD) |
+
+  Note two of these are *metadata*, not visible copy — `opengraph-image.tsx` and
+  the JSON-LD in `seo.ts` — so they will keep asserting it to Google and to link
+  previews even after the visible text is changed. Grep with `\bNABL\b`; a plain
+  `NABL` search also matches "UNABLE" and a case-insensitive one matches
+  "u**nabl**e" / "available".
+
+  If the clinic holds a Nepali accreditation (NPHL, NAMS) name that instead.
+- "15,000+ Happy Patients" and "50+ Expert Doctors" — while `/doctors` lists 9,
   contradicting the claim on the same site.
 - A hardcoded "4.8 ★" on every lab package.
 - Three testimonials with stock names and no source.
-- **"NABL Certified"** — NABL is an *Indian* accreditation body. For a Nepali
-  clinic this is very likely wrong, and it is the kind of claim a regulator or
-  a competitor will check. It currently appears on the homepage, in the site
-  description, and in the JSON-LD.
 
-### 15. Reviews: build or remove
+### 5. Reviews: build or remove
 
 `DoctorRating` accepts `reviews` and `canReview` props and renders a review form
-that submits nowhere. Either build it (schema + endpoint) or delete it.
+whose submit handler does nothing. Either build it (schema + endpoint) or delete
+it. With the `Doctor` table now in place, building it is much cheaper than it was.
 
----
+### 6. Smaller things
 
-## Smaller things noticed, not yet done
+All of these were re-verified as still open on 2026-08-16.
 
-- `src/types/pharmacyOrder.ts` describes an order shape that does not exist
-  (`items: CartItem[]`, `orderDate`) — dead, will mislead. Delete with item 9.
-- The cart is memory-only (`CartContext` uses plain `useState`): refresh or
-  navigate away and it empties. Persist to localStorage.
-- `<img>` instead of `next/image` in several places (homepage hero, epharmacy
-  cards, doctor avatars) — no lazy-loading or CLS protection.
+- The cart is memory-only: refresh or navigate away and it empties. Persist to
+  localStorage. The file is `src/contexts/CartContext.tsx` — note the plural
+  `contexts/`, there is no `src/context/` directory.
+- `<img>` tags instead of `next/image` (homepage hero, epharmacy cards, doctor
+  avatars) — no lazy-loading or CLS protection. Now **10 files**, not the 13
+  previously recorded.
 - No skip link; several pages still lack landmark regions.
-- `middleware.ts` should be renamed to `proxy.ts` (Next 16 deprecation warning
-  on every build).
+- `src/middleware.ts` should be renamed to `src/proxy.ts` (Next 16 deprecation).
+  Still not done — the build output already labels it `ƒ Proxy (Middleware)`.
+- 55 lint warnings, mostly `catch (error: any)` left over from the axios client.
+  They are warnings by choice so CI stays green; worth clearing gradually.
+- No error monitoring. Every failure path is `console.error` into the void.
+- `/api/health` runs `SELECT 1` and is exempt from rate limiting — a free
+  unauthenticated database-query amplifier. Low severity, easy fix.
 - Facebook page is named "Kist Polyclinic And Medical Center Pvt.Ltd." —
   "Polyclinic" as one word, a fourth spelling variant. Site, logo and GBP now
   agree on "Kist Poly Clinic".
@@ -225,8 +265,43 @@ that submits nowhere. Either build it (schema + endpoint) or delete it.
 
 ---
 
-The foundation is sound: the schema is well-indexed, ownership checks are
-consistent on per-resource routes, prices are re-read server-side, and the
-SEO/structured-data layer is above average for a clinic site. Items 1–7 turned
-"vague" into "works". Items 8–10 are what turn "works" into a product a patient
-trusts.
+## Disabled, not deleted
+
+**The prescription feature** is commented out at the product owner's request
+(2026-08-10). Nothing was lost — no patient-facing UI ever created a
+prescription. `src/app/api/prescriptions/route.ts` carries the full rationale,
+the list of every file to touch when re-enabling, and the two security fixes
+that must land first:
+
+1. `prescriptionImageUrl` was accepted as any URL, so a patient could point a
+   record at another patient's object key or an attacker-controlled domain that
+   staff would click from the admin table.
+2. Images were served via `getPublicUrl()` — PHI readable by anyone holding the
+   link if the bucket is public.
+
+The `Prescription` Prisma model is deliberately left in place; dropping it would
+need a destructive migration and it costs nothing to keep.
+
+---
+
+## Verification status
+
+**Re-run and confirmed passing on 2026-08-16:**
+
+| Command | Result |
+|---|---|
+| `npm run lint` | 0 errors, 55 warnings |
+| `npm run typecheck` | clean |
+| `npm run test` | 75 passing, 5 files |
+| `npm run build` | exit 0 |
+
+CI (`.github/workflows/ci.yml`) is configured to run all four on every push,
+plus a Playwright smoke test against a throwaway Postgres — but **it has never
+actually run**, because the work is still uncommitted and unpushed. Its first
+real run will happen when you do step 1.
+
+**Not yet verified by a human:** nobody has clicked through the new booking
+flow, the password reset, or the disabled prescription routes on a deployed
+environment. The Playwright spec covers register → book → dashboard but has
+still not been run against a real database — and cannot be until the Supabase
+project is restored. Smoke-test after applying the migrations.

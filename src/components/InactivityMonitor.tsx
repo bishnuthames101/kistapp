@@ -15,8 +15,12 @@ export default function InactivityMonitor() {
   const { data: session, status, update } = useSession();
   const router = useRouter();
 
-  const lastActivityRef = useRef(Date.now());
-  const lastServerRefreshRef = useRef(Date.now());
+  // Seeded lazily inside the effect rather than at render time. `Date.now()` is
+  // impure, so calling it during render makes the first value depend on which
+  // render happened to run first (and differ between server and client).
+  // 0 reads as "not started yet"; the effect stamps the real time on mount.
+  const lastActivityRef = useRef(0);
+  const lastServerRefreshRef = useRef(0);
   const [showWarning, setShowWarning] = useState(false);
   const [timeLeft, setTimeLeft] = useState(0);
 
@@ -44,6 +48,15 @@ export default function InactivityMonitor() {
 
   useEffect(() => {
     if (status !== 'authenticated') return;
+
+    // Seed the refs on first mount only. Guarded on 0 because this effect also
+    // re-runs when `timeout` changes (the role arrives a tick after `status`),
+    // and re-stamping there would silently extend an already-idle session.
+    if (lastActivityRef.current === 0) {
+      const startedAt = Date.now();
+      lastActivityRef.current = startedAt;
+      lastServerRefreshRef.current = startedAt;
+    }
 
     const onActivity = () => {
       markActive();

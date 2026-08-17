@@ -1,3 +1,21 @@
+/**
+ * PRESCRIPTION FEATURE — DISABLED (not deleted).
+ * See src/app/api/prescriptions/route.ts for the full rationale and the
+ * security fixes required before re-enabling.
+ *
+ * The route now 404s rather than rendering an empty table against a dead API.
+ */
+
+import { notFound } from "next/navigation"
+
+export default function AdminPrescriptions() {
+  notFound()
+}
+
+/* ===========================================================================
+ * ORIGINAL IMPLEMENTATION — uncomment to restore
+ * ===========================================================================
+
 "use client"
 
 import { useState, useEffect } from "react"
@@ -98,3 +116,5 @@ export default function AdminPrescriptions() {
     </div>
   )
 }
+
+ * =========================================================================== */

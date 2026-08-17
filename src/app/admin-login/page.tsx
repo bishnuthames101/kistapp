@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Phone, Lock, AlertCircle } from 'lucide-react';
@@ -10,17 +10,17 @@ function AdminLoginForm() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [timeoutMessage, setTimeoutMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  useEffect(() => {
-    // Check if admin was redirected due to timeout
-    if (searchParams.get('timeout') === 'true') {
-      setTimeoutMessage('Your session has expired due to inactivity (90 seconds). Please login again.');
-    }
-  }, [searchParams]);
+  // Derived during render, not set from an effect. The old copy also claimed
+  // "90 seconds", which stopped being true when the policy moved to
+  // src/lib/session-policy.ts (15 minutes for staff).
+  const timeoutMessage =
+    searchParams.get('timeout') === 'true'
+      ? 'Your session has expired due to inactivity. Please login again.'
+      : '';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

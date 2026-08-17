@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Phone, Mail, MapPin, Clock, Facebook, Instagram} from 'lucide-react';
 import { FaTiktok } from 'react-icons/fa';
 import { siteConfig } from '@/lib/seo';
@@ -40,12 +41,12 @@ export default function Footer() {
           <div>
             <h3 className="text-xl font-bold text-white mb-4">Quick Links</h3>
             <ul className="space-y-2">
-              <li><a href="/about" className="hover:text-blue-400">About Us</a></li>
-              <li><a href="/doctors" className="hover:text-blue-400">Our Doctors</a></li>
-              <li><a href="/services" className="hover:text-blue-400">Book Appointment</a></li>
-              <li><a href="/lab-tests" className="hover:text-blue-400">Book Lab Test</a></li>
-              <li><a href="/epharmacy" className="hover:text-blue-400">Purchase Pharmacy Items</a></li>
-              <li><a href="/contact" className="hover:text-blue-400">Contact Us</a></li>
+              <li><Link href="/about" className="hover:text-blue-400">About Us</Link></li>
+              <li><Link href="/doctors" className="hover:text-blue-400">Our Doctors</Link></li>
+              <li><Link href="/services" className="hover:text-blue-400">Book Appointment</Link></li>
+              <li><Link href="/lab-tests" className="hover:text-blue-400">Book Lab Test</Link></li>
+              <li><Link href="/epharmacy" className="hover:text-blue-400">Purchase Pharmacy Items</Link></li>
+              <li><Link href="/contact" className="hover:text-blue-400">Contact Us</Link></li>
             </ul>
           </div>
 

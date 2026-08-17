@@ -92,7 +92,7 @@ export default function PackageDetailPage() {
           <div className="glass-card p-12 text-center rounded-xl">
             <AlertCircle className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Package Not Found</h1>
-            <p className="text-gray-600 mb-6">The package you're looking for doesn't exist.</p>
+            <p className="text-gray-600 mb-6">The package you&apos;re looking for doesn&apos;t exist.</p>
             <Link href="/lab-tests/packages" className="glass-button bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">
               Browse All Packages
             </Link>

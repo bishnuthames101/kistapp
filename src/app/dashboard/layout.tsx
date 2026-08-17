@@ -2,7 +2,7 @@ import { pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata({
   title: "My Dashboard",
-  description: "Manage your appointments, lab tests, prescriptions and pharmacy orders.",
+  description: "Manage your appointments, lab tests and pharmacy orders.",
   path: "/dashboard",
   noIndex: true,
 });

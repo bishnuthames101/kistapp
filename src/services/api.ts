@@ -24,7 +24,8 @@ export type AppointmentStatus = "pending" | "confirmed" | "completed" | "cancell
 export type LaboratoryTestStatus = AppointmentStatus;
 export type PharmacyOrderStatus = "pending" | "processing" | "delivered" | "cancelled";
 export type PaymentStatus = "pending" | "completed" | "failed";
-export type PrescriptionStatus = "pending" | "verified" | "rejected";
+// PRESCRIPTION FEATURE — DISABLED (not deleted).
+// export type PrescriptionStatus = "pending" | "verified" | "rejected";
 export type StockStatus = "IN_STOCK" | "OUT_OF_STOCK";
 
 /** Patient summary embedded in admin-facing records. */
@@ -44,13 +45,68 @@ export interface User {
   role: "patient" | "admin";
 }
 
+export type BookingMode = "scheduled" | "on_call";
+
+export interface DoctorAvailability {
+  /** 0 = Sunday ... 6 = Saturday. */
+  dayOfWeek: number;
+  /** "HH:MM" */
+  start: string;
+  /** "HH:MM" */
+  end: string;
+}
+
+export interface BookableDoctor {
+  id: string;
+  slug: string;
+  legacyId: number | null;
+  name: string;
+  specialty: string;
+  education: string;
+  experience: string;
+  image: string | null;
+  scheduleNote: string;
+  opdCharge: number;
+  nmcNumber: string;
+  bookingMode: BookingMode;
+  slotDurationMinutes: number;
+  availability: DoctorAvailability[];
+}
+
+export interface Slot {
+  /** "HH:MM" */
+  time: string;
+  available: boolean;
+  reason?: "booked" | "too-soon";
+}
+
+export interface DoctorSlots {
+  doctor: {
+    id: string;
+    slug: string;
+    name: string;
+    specialty: string;
+    opdCharge: number;
+    scheduleNote: string;
+  };
+  /** "YYYY-MM-DD" */
+  date: string;
+  bookingMode: BookingMode;
+  slots: Slot[];
+  message?: string;
+}
+
 export interface Appointment {
   id: string;
   patientId: string;
+  doctorId: string | null;
   doctorName: string;
   doctorSpecialization: string;
+  /** The consultation fee agreed at booking. Null on pre-migration rows. */
+  opdCharge: number | null;
   /** "YYYY-MM-DD" */
   appointmentDate: string;
+  /** "HH:MM", or "" for an on-call request the clinic has not timed yet. */
   appointmentTime: string;
   status: AppointmentStatus;
   reason?: string | null;
@@ -104,16 +160,20 @@ export interface PharmacyOrder {
   medicine?: Medicine;
 }
 
-export interface Prescription {
-  id: string;
-  patientId: string;
-  prescriptionImageUrl: string;
-  status: PrescriptionStatus;
-  notes?: string | null;
-  createdAt: string;
-  updatedAt: string;
-  patient?: PatientSummary;
-}
+// PRESCRIPTION FEATURE — DISABLED (not deleted). See
+// src/app/api/prescriptions/route.ts for the rationale and the security fixes
+// required before re-enabling.
+//
+// export interface Prescription {
+//   id: string;
+//   patientId: string;
+//   prescriptionImageUrl: string;
+//   status: PrescriptionStatus;
+//   notes?: string | null;
+//   createdAt: string;
+//   updatedAt: string;
+//   patient?: PatientSummary;
+// }
 
 /* -------------------------------------------------------------------------- */
 /*                                 Endpoints                                  */
@@ -128,16 +188,32 @@ function query(params: Record<string, string | number | boolean | undefined>) {
   return qs ? `?${qs}` : "";
 }
 
+export const doctors = {
+  list: (params: { page?: number; limit?: number } = {}) =>
+    getList<BookableDoctor>(`/doctors${query(params)}`),
+  /** Real availability for one doctor on one date. */
+  slots: (doctorId: string, date: string) =>
+    get<DoctorSlots>(`/doctors/${encodeURIComponent(doctorId)}/slots${query({ date })}`),
+};
+
 export const appointments = {
   list: (params: { page?: number; limit?: number } = {}) =>
     getList<Appointment>(`/appointments${query(params)}`),
   page: (params: { page?: number; limit?: number } = {}) =>
     getPage<Appointment>(`/appointments${query(params)}`),
+  /**
+   * `doctorId` accepts the cuid, the slug, or the numeric id used in
+   * /doctors/[id] URLs. The server reads the name, specialty and fee from the
+   * doctor record — sending them from here would let the client disagree with
+   * the doctor it is booking.
+   *
+   * `appointmentTime` is omitted for on-call doctors: the clinic sets it when
+   * it confirms.
+   */
   create: (data: {
-    doctorName: string;
-    doctorSpecialization: string;
+    doctorId: string;
     appointmentDate: string;
-    appointmentTime: string;
+    appointmentTime?: string;
     reason?: string;
     notes?: string;
   }) => post<Appointment>("/appointments", data),
@@ -211,13 +287,16 @@ export const medicines = {
   remove: (id: string) => del<{ message?: string }>(`/medicines/${id}`),
 };
 
-export const prescriptions = {
-  list: (params: { page?: number; limit?: number } = {}) =>
-    getList<Prescription>(`/prescriptions${query(params)}`),
-  getById: (id: string) => get<Prescription>(`/prescriptions/${id}`),
-  create: (data: { prescriptionImageUrl: string; notes?: string }) =>
-    post<Prescription>("/prescriptions", data),
-  update: (id: string, data: Partial<Pick<Prescription, "status" | "notes">>) =>
-    patch<Prescription>(`/prescriptions/${id}`, data),
-  remove: (id: string) => del<{ message?: string }>(`/prescriptions/${id}`),
-};
+// PRESCRIPTION FEATURE — DISABLED (not deleted). The endpoints now 404; see
+// src/app/api/prescriptions/route.ts before re-enabling.
+//
+// export const prescriptions = {
+//   list: (params: { page?: number; limit?: number } = {}) =>
+//     getList<Prescription>(`/prescriptions${query(params)}`),
+//   getById: (id: string) => get<Prescription>(`/prescriptions/${id}`),
+//   create: (data: { prescriptionImageUrl: string; notes?: string }) =>
+//     post<Prescription>("/prescriptions", data),
+//   update: (id: string, data: Partial<Pick<Prescription, "status" | "notes">>) =>
+//     patch<Prescription>(`/prescriptions/${id}`, data),
+//   remove: (id: string) => del<{ message?: string }>(`/prescriptions/${id}`),
+// };

@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin, STORAGE_BUCKETS } from "@/lib/supabase"
 import { requireAuth } from "@/lib/auth"
-import { uploadLimiter, getRateLimitHeaders } from "@/lib/ratelimit"
+import { uploadLimiter, checkLimit, tooManyRequests } from "@/lib/ratelimit"
+import { getClientIp } from "@/lib/request-ip"
 
+// A bucket missing from this map is rejected by the MIME check below, so
+// removing an entry is enough to close the upload path for it.
 const ALLOWED_TYPES: Record<string, string[]> = {
   medicines: ["image/jpeg", "image/png", "image/webp"],
-  prescriptions: ["image/jpeg", "image/png", "application/pdf"],
+  // PRESCRIPTION FEATURE — DISABLED (not deleted). See
+  // src/app/api/prescriptions/route.ts. Note that re-enabling this line alone
+  // is NOT sufficient: uploads here are handed out via `getPublicUrl()` below,
+  // which leaks PHI if the bucket is public. Move to `createSignedUrl()` first.
+  // prescriptions: ["image/jpeg", "image/png", "application/pdf"],
   "medical-records": ["application/pdf", "image/jpeg", "image/png"],
 }
 
@@ -28,15 +35,12 @@ export async function POST(req: NextRequest) {
     const { user, error: authError } = await requireAuth()
     if (authError) return authError
 
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anonymous"
-    const { success, limit, reset, remaining } = await uploadLimiter.limit(
-      `${user!.id}:${ip}`
+    const limitResult = await checkLimit(
+      uploadLimiter,
+      `${user!.id}:${getClientIp(req)}`
     )
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many uploads. Please try again later." },
-        { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
-      )
+    if (!limitResult.success) {
+      return tooManyRequests(limitResult, "Too many uploads. Please try again later.")
     }
 
     const formData = await req.formData()

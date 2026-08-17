@@ -421,7 +421,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 leading-relaxed">
-                "Excellent service and very professional staff. The doctors are knowledgeable and caring. I highly recommend Kist Poly Clinic for all your healthcare needs."
+                &ldquo;Excellent service and very professional staff. The doctors are knowledgeable and caring. I highly recommend Kist Poly Clinic for all your healthcare needs.&rdquo;
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
@@ -441,7 +441,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 leading-relaxed">
-                "The lab test results were quick and accurate. The staff explained everything clearly. Very satisfied with the service and affordable pricing."
+                &ldquo;The lab test results were quick and accurate. The staff explained everything clearly. Very satisfied with the service and affordable pricing.&rdquo;
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
@@ -461,7 +461,7 @@ export default function HomePage() {
                 ))}
               </div>
               <p className="text-gray-700 mb-6 leading-relaxed">
-                "Great experience with the home visit service. Dr. Arbind was very thorough and professional. Highly recommended for elderly patients."
+                &ldquo;Great experience with the home visit service. Dr. Arbind was very thorough and professional. Highly recommended for elderly patients.&rdquo;
               </p>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">

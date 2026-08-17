@@ -1,8 +1,22 @@
 import { NextRequest, NextResponse } from "next/server"
+import { Prisma } from "@prisma/client"
 import { prisma } from "@/lib/prisma"
 import { requireAuth } from "@/lib/auth"
-import { paginated, toDateOnly } from "@/lib/serialize"
+import { findDoctorByAnyId, SLOT_HOLDING_STATUSES } from "@/lib/doctors"
+import { paginated, toDateOnly, toNumber } from "@/lib/serialize"
+import { getSlotAvailability, validateAppointmentDate } from "@/lib/slots"
 import { z } from "zod"
+
+/** Money as a number and the date column as "YYYY-MM-DD", as everywhere else. */
+function serializeAppointment<
+  T extends { appointmentDate: Date | string; opdCharge?: Prisma.Decimal | number | null }
+>(appointment: T) {
+  return {
+    ...appointment,
+    appointmentDate: toDateOnly(appointment.appointmentDate),
+    opdCharge: appointment.opdCharge == null ? null : toNumber(appointment.opdCharge),
+  }
+}
 
 // GET /api/appointments - Get appointments (all for admin, user's for patients)
 export async function GET(req: NextRequest) {
@@ -44,15 +58,7 @@ export async function GET(req: NextRequest) {
     ])
 
     return NextResponse.json(
-      paginated(
-        appointments.map((appointment) => ({
-          ...appointment,
-          appointmentDate: toDateOnly(appointment.appointmentDate),
-        })),
-        total,
-        page,
-        limit
-      )
+      paginated(appointments.map(serializeAppointment), total, page, limit)
     )
   } catch (error) {
     console.error("Error fetching appointments:", error)
@@ -64,13 +70,18 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/appointments - Create appointment
+//
+// `doctorId` is what actually identifies the doctor. The name and
+// specialization are no longer accepted from the client: they are read from
+// the Doctor row and stored as a snapshot, so a patient cannot book "Dr.
+// Whoever" and the record cannot disagree with the doctor it points at.
 const createAppointmentSchema = z.object({
-  doctorName: z.string().min(1, "Doctor name is required"),
-  doctorSpecialization: z.string().min(1, "Specialization is required"),
+  doctorId: z.string().min(1, "Please choose a doctor"),
   appointmentDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Invalid date format"),
-  appointmentTime: z.string().min(1, "Time is required"),
-  reason: z.string().optional(),
-  notes: z.string().optional(),
+  /** Omitted or empty for on-call doctors, where the clinic sets the time. */
+  appointmentTime: z.string().optional(),
+  reason: z.string().max(1000).optional(),
+  notes: z.string().max(1000).optional(),
 })
 
 export async function POST(req: NextRequest) {
@@ -81,29 +92,102 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const validated = createAppointmentSchema.parse(body)
 
-    // Check if appointment date is not in the past
-    const appointmentDate = new Date(validated.appointmentDate)
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
+    const dateCheck = validateAppointmentDate(validated.appointmentDate)
+    if (!dateCheck.ok) {
+      return NextResponse.json({ error: dateCheck.error }, { status: 400 })
+    }
+    const appointmentDate = dateCheck.date
 
-    if (appointmentDate < today) {
-      return NextResponse.json(
-        { error: "Appointment date cannot be in the past" },
-        { status: 400 }
-      )
+    const doctor = await findDoctorByAnyId(validated.doctorId)
+    if (!doctor || !doctor.isActive) {
+      return NextResponse.json({ error: "Doctor not found" }, { status: 404 })
+    }
+
+    let appointmentTime = (validated.appointmentTime ?? "").trim()
+
+    if (doctor.bookingMode === "on_call") {
+      // No timetable exists for these doctors, so any time the client sends is
+      // made up. Store the request without one; the clinic fills it in when it
+      // confirms.
+      appointmentTime = ""
+    } else {
+      if (!appointmentTime) {
+        return NextResponse.json(
+          { error: "Please choose an appointment time" },
+          { status: 400 }
+        )
+      }
+
+      // Re-derive availability server-side. The client already filtered the
+      // list, but that is a convenience, not a control.
+      const taken = await prisma.appointment.findMany({
+        where: {
+          doctorId: doctor.id,
+          appointmentDate,
+          status: { in: [...SLOT_HOLDING_STATUSES] },
+        },
+        select: { appointmentTime: true },
+      })
+
+      const slot = getSlotAvailability({
+        windows: doctor.schedules,
+        slotDurationMinutes: doctor.slotDurationMinutes,
+        date: appointmentDate,
+        bookedTimes: taken.map((appointment) => appointment.appointmentTime),
+      }).find((candidate) => candidate.time === appointmentTime)
+
+      if (!slot) {
+        return NextResponse.json(
+          { error: "That time is not part of this doctor's schedule" },
+          { status: 400 }
+        )
+      }
+
+      if (!slot.available) {
+        return NextResponse.json(
+          {
+            error:
+              slot.reason === "booked"
+                ? "That slot has just been taken. Please choose another time."
+                : "That slot is too close to now. Please choose a later time.",
+          },
+          { status: 409 }
+        )
+      }
     }
 
     const appointment = await prisma.appointment.create({
       data: {
-        ...validated,
-        appointmentDate,
         patientId: user!.id,
+        doctorId: doctor.id,
+        // Snapshots, so the record still reads correctly if the doctor is
+        // later renamed or changes specialty.
+        doctorName: doctor.name,
+        doctorSpecialization: doctor.specialty,
+        opdCharge: doctor.opdCharge,
+        appointmentDate,
+        appointmentTime,
+        reason: validated.reason,
+        notes: validated.notes,
         status: "pending",
       },
     })
 
-    return NextResponse.json(appointment, { status: 201 })
+    return NextResponse.json(serializeAppointment(appointment), { status: 201 })
   } catch (error) {
+    // The partial unique index on (doctor, date, time) is what actually
+    // prevents double-booking: two requests can both pass the availability
+    // check above and only one can win here.
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === "P2002"
+    ) {
+      return NextResponse.json(
+        { error: "That slot has just been taken. Please choose another time." },
+        { status: 409 }
+      )
+    }
+
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: "Validation failed", details: (error as any).errors },

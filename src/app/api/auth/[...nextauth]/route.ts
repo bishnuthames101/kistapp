@@ -1,9 +1,15 @@
 import NextAuth, { NextAuthOptions } from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
-import bcrypt from "bcryptjs"
+import {
+  verifyPassword,
+  fakeVerifyPassword,
+  needsRehash,
+  hashPassword,
+} from "@/lib/password"
 import { NextRequest, NextResponse } from "next/server"
-import { authLimiter, getRateLimitHeaders } from "@/lib/ratelimit"
+import { authLimiter, checkLimit, tooManyRequests } from "@/lib/ratelimit"
+import { getClientIp } from "@/lib/request-ip"
 import { inactivityTimeoutFor } from "@/lib/session-policy"
 
 export const authOptions: NextAuthOptions = {
@@ -23,14 +29,34 @@ export const authOptions: NextAuthOptions = {
           where: { phone: credentials.phone }
         })
 
+        // Anti-enumeration: when there is no such account (or it is disabled)
+        // we still burn the same bcrypt time before failing. Otherwise
+        // "unknown phone" returns in ~1ms while "known phone, wrong password"
+        // takes ~250ms, and that gap alone tells an attacker which phone
+        // numbers belong to patients of this clinic.
         if (!user || !user.isActive) {
+          await fakeVerifyPassword(credentials.password)
           throw new Error("Invalid credentials")
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password)
+        const isValid = await verifyPassword(credentials.password, user.password)
 
         if (!isValid) {
           throw new Error("Invalid credentials")
+        }
+
+        // Opportunistically upgrade accounts still on the old cost-10 hash.
+        // Done here because it is the only moment we hold the plaintext.
+        // Best-effort: a failure here must never block a valid login.
+        if (needsRehash(user.password)) {
+          try {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { password: await hashPassword(credentials.password) },
+            })
+          } catch (err) {
+            console.error("Failed to upgrade password hash for", user.id, err)
+          }
         }
 
         return {
@@ -134,12 +160,14 @@ export async function POST(
   const isCredentialsSignIn = params.nextauth?.join("/") === "callback/credentials"
 
   if (isCredentialsSignIn) {
-    const ip = req.headers.get("x-forwarded-for")?.split(",")[0].trim() ?? "anonymous"
-    const { success, limit, reset, remaining } = await authLimiter.limit(ip)
-    if (!success) {
-      return NextResponse.json(
-        { error: "Too many login attempts. Please try again later." },
-        { status: 429, headers: getRateLimitHeaders(limit, remaining, reset) }
+    // `checkLimit` never throws. Previously an Upstash outage produced a 500
+    // here and took login down for the whole clinic; now it degrades to a
+    // per-instance in-memory limit instead.
+    const limitResult = await checkLimit(authLimiter, getClientIp(req))
+    if (!limitResult.success) {
+      return tooManyRequests(
+        limitResult,
+        "Too many login attempts. Please try again later."
       )
     }
   }
