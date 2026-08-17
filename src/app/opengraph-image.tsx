@@ -55,7 +55,7 @@ export default async function OpengraphImage() {
             lineHeight: 1.35,
           }}
         >
-          Doctor consultations, NABL-certified lab tests and online pharmacy
+          Doctor consultations, in-house lab tests and online pharmacy
         </div>
         <div
           style={{

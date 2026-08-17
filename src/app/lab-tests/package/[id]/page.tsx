@@ -146,7 +146,7 @@ export default function PackageDetailPage() {
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <Shield className="w-8 h-8 text-green-600 mx-auto mb-2" />
-                    <p className="text-xs font-semibold text-gray-700">NABL Certified</p>
+                    <p className="text-xs font-semibold text-gray-700">In-House Lab</p>
                   </div>
                   <div>
                     <Package className="w-8 h-8 text-blue-600 mx-auto mb-2" />
@@ -265,7 +265,7 @@ export default function PackageDetailPage() {
                   3
                 </div>
                 <h3 className="font-semibold mb-2">Lab Processing</h3>
-                <p className="text-sm text-gray-600">Our certified lab processes your samples</p>
+                <p className="text-sm text-gray-600">Our in-house lab processes your samples</p>
               </div>
               <div className="text-center">
                 <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-orange-600">

@@ -8,7 +8,7 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata = pageMetadata({
   title: 'Laboratory Tests & Health Checkups',
   description:
-    'Book NABL-certified lab tests at Kist Poly Clinic, Lalitpur. Blood tests, thyroid, diabetes, hormone and full body checkup packages with home sample collection and fast results.',
+    'Book lab tests at Kist Poly Clinic, Lalitpur. Blood tests, thyroid, diabetes, hormone and full body checkup packages with home sample collection and fast results.',
   path: '/lab-tests',
   keywords: ['lab test Lalitpur', 'blood test near me', 'full body checkup Nepal', 'home sample collection Lalitpur'],
 });
@@ -54,8 +54,8 @@ export default function LabTestsPage() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="glass-card p-6 text-center rounded-xl hover:shadow-xl transition-shadow">
               <Shield className="w-12 h-12 text-blue-600 mx-auto mb-4" />
-              <h3 className="font-semibold text-gray-800 mb-2">NABL Certified</h3>
-              <p className="text-sm text-gray-600">Accredited lab with highest quality standards</p>
+              <h3 className="font-semibold text-gray-800 mb-2">In-House Laboratory</h3>
+              <p className="text-sm text-gray-600">Samples processed on site, not outsourced</p>
             </div>
             <div className="glass-card p-6 text-center rounded-xl hover:shadow-xl transition-shadow">
               <Clock className="w-12 h-12 text-purple-600 mx-auto mb-4" />

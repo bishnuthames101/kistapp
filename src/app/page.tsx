@@ -114,7 +114,7 @@ export default function HomePage() {
                       <CheckCircle className="w-6 h-6 text-green-600" />
                     </div>
                     <div>
-                      <div className="font-bold text-gray-900">NABL Certified</div>
+                      <div className="font-bold text-gray-900">In-House Lab</div>
                       <div className="text-sm text-gray-600">Quality Assured</div>
                     </div>
                   </div>
@@ -144,8 +144,8 @@ export default function HomePage() {
               <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-3">
                 <Shield className="w-8 h-8 text-blue-600" />
               </div>
-              <h3 className="font-bold text-gray-900 mb-1">NABL Certified Lab</h3>
-              <p className="text-sm text-gray-600">Highest Quality Standards</p>
+              <h3 className="font-bold text-gray-900 mb-1">In-House Laboratory</h3>
+              <p className="text-sm text-gray-600">Samples Processed On Site</p>
             </div>
             <div className="text-center">
               <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -350,9 +350,9 @@ export default function HomePage() {
               <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center mb-6">
                 <Shield className="w-7 h-7 text-white" />
               </div>
-              <h3 className="text-2xl font-bold mb-4">NABL Certified Lab</h3>
+              <h3 className="text-2xl font-bold mb-4">In-House Laboratory</h3>
               <p className="text-blue-100 leading-relaxed">
-                State-of-the-art laboratory with NABL certification ensuring accurate and reliable test results.
+                Our own on-site laboratory processes your samples directly, so results come back quickly and without a third-party handover.
               </p>
             </div>
 

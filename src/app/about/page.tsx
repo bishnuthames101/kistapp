@@ -5,7 +5,7 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata = pageMetadata({
   title: 'About Us',
   description:
-    'Kist Poly Clinic has served Balkumari, Lalitpur since 2067 BS with modern facilities, experienced doctors and a NABL-certified laboratory. Learn about our mission and values.',
+    'Kist Poly Clinic has served Balkumari, Lalitpur since 2067 BS with modern facilities, experienced doctors and an in-house laboratory. Learn about our mission and values.',
   path: '/about',
   keywords: ['about Kist Poly Clinic', 'clinic in Balkumari Lalitpur', 'trusted clinic Nepal'],
 });

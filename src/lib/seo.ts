@@ -14,7 +14,7 @@ export const siteConfig = {
     ""
   ),
   description:
-    "Kist Poly Clinic in Balkumari, Lalitpur offers doctor consultations, NABL-certified lab tests, health checkup packages, home sample collection and an online pharmacy with doorstep delivery.",
+    "Kist Poly Clinic in Balkumari, Lalitpur offers doctor consultations, in-house lab tests, health checkup packages, home sample collection and an online pharmacy with doorstep delivery.",
   locale: "en_NP",
   telephone: "+977-01-5202097",
   email: "kistpolyclinic@gmail.com",
