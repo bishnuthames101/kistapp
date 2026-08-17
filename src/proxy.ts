@@ -8,7 +8,7 @@ import { rateLimitIdentifier } from '@/lib/request-ip';
 // plus the health probe which uptime monitors poll frequently.
 const RATE_LIMIT_EXEMPT = ['/api/auth', '/api/health'];
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Get the NextAuth session token

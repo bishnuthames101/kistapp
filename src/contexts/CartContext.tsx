@@ -1,7 +1,32 @@
 'use client';
 
-import { createContext, useContext, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, ReactNode } from 'react';
 import { Medicine, CartItem } from '../types/medicine';
+
+const STORAGE_KEY = 'kist.cart.v1';
+
+/**
+ * The stored cart is user-editable — anyone can open devtools and change a
+ * price. That is fine: it is a convenience cache for the UI only, and the
+ * server re-reads every price from the Medicine table when an order is placed.
+ * Never treat anything read back from here as authoritative.
+ */
+function readStoredCart(): CartItem[] {
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    // Drop anything that does not still look like a cart line, so one bad
+    // entry from an older shape cannot break the whole epharmacy.
+    return parsed.filter(
+      (item): item is CartItem =>
+        item && typeof item.id === 'string' && typeof item.quantity === 'number'
+    );
+  } catch {
+    return [];
+  }
+}
 
 interface CartContextType {
   items: CartItem[];
@@ -16,6 +41,33 @@ const CartContext = createContext<CartContextType | null>(null);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const hydrated = useRef(false);
+
+  // Read on mount rather than in useState's initialiser: localStorage does not
+  // exist during the server render, and seeding state from it would make the
+  // first client render disagree with the server's HTML.
+  useEffect(() => {
+    const stored = readStoredCart();
+    // The rule below guards against cascading renders. Rehydrating from a
+    // browser-only store is the documented exception: it cannot be done during
+    // render because localStorage does not exist on the server, and it runs
+    // exactly once on mount.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (stored.length > 0) setItems(stored);
+    hydrated.current = true;
+  }, []);
+
+  // Guarded on hydration so the empty initial state cannot overwrite a real
+  // stored cart in the tick before the effect above runs.
+  useEffect(() => {
+    if (!hydrated.current) return;
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    } catch {
+      // Private mode or a full quota. A cart that does not survive a refresh is
+      // worth strictly less than one that throws on every change.
+    }
+  }, [items]);
 
   const addToCart = (medicine: Medicine) => {
     setItems(currentItems => {
